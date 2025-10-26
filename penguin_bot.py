@@ -103,6 +103,13 @@ def chat_with_cowalsky(user_input):
     except Exception as e:
         return f"⚠️ Error: {e}"
 
+# --- Initialize session state ---
+if "chat_history" not in st.session_state:
+    st.session_state.chat_history = []
+
+if "chat_input" not in st.session_state:
+    st.session_state.chat_input = ""
+
 # --- App Layout ---
 st.title("🐧 Cowalsky the Penguin Assistant")
 st.caption("Minimalistic Penguin AI Helper · Powered by OpenAI")
@@ -141,21 +148,22 @@ with st.sidebar:
 
 # --- Chat Section ---
 st.subheader("💬 Chat with Cowalsky")
-if "chat_history" not in st.session_state: st.session_state.chat_history = []
 
 chat_col1, chat_col2 = st.columns([4,1])
 with chat_col1:
-    chat_input = st.text_input("You:", placeholder="Ask Cowalsky anything...")
+    st.session_state.chat_input = st.text_input("You:", value=st.session_state.chat_input, placeholder="Ask Cowalsky anything...")
 with chat_col2:
     send_btn = st.button("Send")
 
-if send_btn and chat_input.strip():
+if send_btn and st.session_state.chat_input.strip():
+    # Get bot reply
     with st.spinner("🐧 Thinking..."):
-        bot_reply = chat_with_cowalsky(chat_input)
-    st.session_state.chat_history.append(("You", chat_input))
+        bot_reply = chat_with_cowalsky(st.session_state.chat_input)
+    # Append to chat history
+    st.session_state.chat_history.append(("You", st.session_state.chat_input))
     st.session_state.chat_history.append(("🐧 Cowalsky", bot_reply))
+    # Clear input
     st.session_state.chat_input = ""
-    st.experimental_rerun()  # refresh to clear input but keep chat
 
 # Display chat history
 for sender, message in st.session_state.chat_history:
