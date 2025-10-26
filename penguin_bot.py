@@ -1,5 +1,3 @@
-
-You said:
 import os
 import socket
 import qrcode
@@ -166,8 +164,8 @@ if send_btn and chat_input_val and chat_input_val.strip() != "":
     # Clear input box
     st.session_state.chat_input = ""
 
-# Display chat history with newest messages at the top
-for sender, message in reversed(st.session_state.chat_history):
+# Display chat history
+for sender, message in st.session_state.chat_history:
     st.markdown(f"**{sender}:** {message}")
 
 # --- Image Analysis Section ---
@@ -179,7 +177,6 @@ image_prompt = st.text_input("Ask Cowalsky about this image:")
 if uploaded_img and st.button("Analyze Image"):
     with st.spinner("Analyzing image..."):
         result = analyze_image(uploaded_img, image_prompt)
-        st.markdown(f"**🐧 Cowalsky:** {result}")
-
-st.markdown("---")
-st.caption("🐧 Created by Parth, Arnav, Aarav and Cowalsky · Powered by OpenAI") 
+        # Append image analysis to chat history
+        st.session_state.chat_history.append(("You (image)", image_prompt))
+        st.session_state.chat_history.append(("🐧 Cowalsky", result))
