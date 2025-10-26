@@ -110,6 +110,10 @@ if "chat_history" not in st.session_state:
 if "chat_input" not in st.session_state:
     st.session_state.chat_input = ""
 
+# Callback to safely clear chat input
+def clear_chat_input():
+    st.session_state.chat_input = ""
+
 # --- App Layout ---
 st.title("🐧 Cowalsky the Penguin Assistant")
 st.caption("Minimalistic Penguin AI Helper · Powered by OpenAI")
@@ -148,7 +152,6 @@ with st.sidebar:
 
 # --- Chat Section ---
 st.subheader("💬 Chat with Cowalsky")
-
 chat_col1, chat_col2 = st.columns([4,1])
 with chat_col1:
     chat_input_val = st.text_input("You:", key="chat_input", placeholder="Ask Cowalsky anything...")
@@ -161,10 +164,10 @@ if send_btn and st.session_state.chat_input.strip() != "":
         bot_reply = chat_with_cowalsky(st.session_state.chat_input)
     st.session_state.chat_history.append(("You", st.session_state.chat_input))
     st.session_state.chat_history.append(("🐧 Cowalsky", bot_reply))
-    # Clear only the input box
-    st.session_state.chat_input = ""
+    # Safely clear input
+    clear_chat_input()
 
-# Display chat history with newest messages at the top
+# Display chat history
 for sender, message in reversed(st.session_state.chat_history):
     st.markdown(f"**{sender}:** {message}")
 
