@@ -164,8 +164,8 @@ if send_btn and chat_input_val and chat_input_val.strip() != "":
     # Clear input box
     st.session_state.chat_input = ""
 
-# Display chat history
-for sender, message in st.session_state.chat_history:
+# Display chat history with newest messages at the top
+for sender, message in reversed(st.session_state.chat_history):
     st.markdown(f"**{sender}:** {message}")
 
 # --- Image Analysis Section ---
@@ -180,4 +180,4 @@ if uploaded_img and st.button("Analyze Image"):
         st.markdown(f"**🐧 Cowalsky:** {result}")
 
 st.markdown("---")
-st.caption("🐧 Created by Parth , Arnav , Aarav and Cowalsky · Powered by OpenAI")
+st.caption("🐧 Created by Parth, Arnav, Aarav and Cowalsky · Powered by OpenAI")
