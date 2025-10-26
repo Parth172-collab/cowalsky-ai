@@ -23,7 +23,7 @@ st.set_page_config(
     layout="centered"
 )
 
-# --- Minimal CSS ---
+# --- Minimalistic CSS ---
 st.markdown(
     """
     <style>
@@ -102,7 +102,7 @@ def analyze_image(image_file, user_prompt):
                 {"role": "system", "content": "You are Cowalsky, a clever and cute penguin assistant who helps users analyze and describe images."},
                 {"role": "user", "content": [
                     {"type": "text", "text": user_prompt},
-                    {"type": "image_url", "image_url": f"data:image/png;base64,{base64_img}"}
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}
                 ]}
             ]
         )
@@ -180,13 +180,24 @@ if uploaded_img and st.button("Analyze Image"):
 # --- Chat Section ---
 st.divider()
 st.subheader("💬 Chat with Cowalsky")
-user_message = st.text_input("You:", placeholder="Ask Cowalsky anything...")
 
-if st.button("Send"):
-    with st.spinner("🐧 Thinking..."):
-        bot_reply = chat_with_cowalsky(user_message)
-        st.markdown(f"**🐧 Cowalsky:** {bot_reply}")
+# Use session_state to handle chat input reset
+if "user_message" not in st.session_state:
+    st.session_state.user_message = ""
+
+def submit_chat():
+    st.session_state.submitted = True
+
+user_message = st.text_input("You:", value=st.session_state.user_message, placeholder="Ask Cowalsky anything...", on_change=submit_chat)
+
+if st.session_state.get("submitted", False):
+    if user_message.strip():
+        with st.spinner("🐧 Thinking..."):
+            bot_reply = chat_with_cowalsky(user_message)
+            st.markdown(f"**🐧 Cowalsky:** {bot_reply}")
+    # Reset input field
+    st.session_state.user_message = ""
+    st.session_state.submitted = False
 
 st.markdown("---")
-st.caption("🐧 Created by Parth and Cowalsky · Powered by OpenAI")
-
+st.caption("🐧 Created by Parth , Arnav ,Aarav and Cowalsky · Powered by OpenAI")
