@@ -1,3 +1,5 @@
+
+You said:
 import os
 import socket
 import qrcode
@@ -110,10 +112,6 @@ if "chat_history" not in st.session_state:
 if "chat_input" not in st.session_state:
     st.session_state.chat_input = ""
 
-# Callback to safely clear chat input
-def clear_chat_input():
-    st.session_state.chat_input = ""
-
 # --- App Layout ---
 st.title("🐧 Cowalsky the Penguin Assistant")
 st.caption("Minimalistic Penguin AI Helper · Powered by OpenAI")
@@ -129,7 +127,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("🧾 Generate QR Code")
-    qr_data = st.text_input("Enter text or URL:", key="qr_input")
+    qr_data = st.text_input("Enter text or URL:")
     if st.button("Generate QR"):
         if qr_data.strip():
             qr_img = make_qr(qr_data)
@@ -140,7 +138,7 @@ with st.sidebar:
 
     st.divider()
     st.subheader("🎨 Generate Image")
-    img_prompt = st.text_input("Enter image prompt:", key="img_prompt_input")
+    img_prompt = st.text_input("Enter image prompt:")
     if st.button("Generate Image"):
         with st.spinner("Drawing your image..."):
             img_data = generate_image(img_prompt)
@@ -152,22 +150,23 @@ with st.sidebar:
 
 # --- Chat Section ---
 st.subheader("💬 Chat with Cowalsky")
+
 chat_col1, chat_col2 = st.columns([4,1])
 with chat_col1:
-    chat_input_val = st.text_input("You:", key="chat_input", placeholder="Ask Cowalsky anything...")
+    chat_input_val = st.text_input("You:", value=st.session_state.chat_input, placeholder="Ask Cowalsky anything...")
 with chat_col2:
     send_btn = st.button("Send")
 
 # Handle sending chat
-if send_btn and st.session_state.chat_input.strip() != "":
+if send_btn and chat_input_val and chat_input_val.strip() != "":
     with st.spinner("🐧 Thinking..."):
-        bot_reply = chat_with_cowalsky(st.session_state.chat_input)
-    st.session_state.chat_history.append(("You", st.session_state.chat_input))
+        bot_reply = chat_with_cowalsky(chat_input_val)
+    st.session_state.chat_history.append(("You", chat_input_val))
     st.session_state.chat_history.append(("🐧 Cowalsky", bot_reply))
-    # Safely clear input
-    clear_chat_input()
+    # Clear input box
+    st.session_state.chat_input = ""
 
-# Display chat history
+# Display chat history with newest messages at the top
 for sender, message in reversed(st.session_state.chat_history):
     st.markdown(f"**{sender}:** {message}")
 
@@ -175,7 +174,7 @@ for sender, message in reversed(st.session_state.chat_history):
 st.divider()
 st.subheader("🖼️ Upload Image for Analysis")
 uploaded_img = st.file_uploader("Upload an image (JPG, PNG)", type=["jpg","jpeg","png"])
-image_prompt = st.text_input("Ask Cowalsky about this image:", key="image_chat_input")
+image_prompt = st.text_input("Ask Cowalsky about this image:")
 
 if uploaded_img and st.button("Analyze Image"):
     with st.spinner("Analyzing image..."):
@@ -183,4 +182,4 @@ if uploaded_img and st.button("Analyze Image"):
         st.markdown(f"**🐧 Cowalsky:** {result}")
 
 st.markdown("---")
-st.caption("🐧 Created by Parth, Arnav, Aarav and Cowalsky · Powered by OpenAI")
+st.caption("🐧 Created by Parth, Arnav, Aarav and Cowalsky · Powered by OpenAI") 
