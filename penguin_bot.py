@@ -151,18 +151,17 @@ st.subheader("💬 Chat with Cowalsky")
 
 chat_col1, chat_col2 = st.columns([4,1])
 with chat_col1:
-    st.session_state.chat_input = st.text_input("You:", value=st.session_state.chat_input, placeholder="Ask Cowalsky anything...")
+    chat_input_val = st.text_input("You:", value=st.session_state.chat_input, placeholder="Ask Cowalsky anything...")
 with chat_col2:
     send_btn = st.button("Send")
 
-if send_btn and st.session_state.chat_input.strip():
-    # Get bot reply
+# Handle sending chat
+if send_btn and chat_input_val and chat_input_val.strip() != "":
     with st.spinner("🐧 Thinking..."):
-        bot_reply = chat_with_cowalsky(st.session_state.chat_input)
-    # Append to chat history
-    st.session_state.chat_history.append(("You", st.session_state.chat_input))
+        bot_reply = chat_with_cowalsky(chat_input_val)
+    st.session_state.chat_history.append(("You", chat_input_val))
     st.session_state.chat_history.append(("🐧 Cowalsky", bot_reply))
-    # Clear input
+    # Clear input box
     st.session_state.chat_input = ""
 
 # Display chat history
