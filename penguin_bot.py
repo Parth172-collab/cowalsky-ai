@@ -1,4 +1,5 @@
 import os
+import platform
 import socket
 import qrcode
 import base64
@@ -11,150 +12,181 @@ from openai import OpenAI
 from PIL import Image
 import streamlit as st
 
---- Load environment variables ---
-
+# --- Load environment and API ---
 load_dotenv()
-api_key = os.getenv("OPENAI_API_KEY") or st.secrets.get("OPENAI_API_KEY")
-client = OpenAI(api_key=api_key)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
---- Streamlit Page Setup ---
+# --- Page Configuration ---
+st.set_page_config(
+    page_title="🐧 Cowalsky - Penguin Assistant",
+    page_icon="🐧",
+    layout="centered"
+)
 
-st.set_page_config(page_title="🐧 Cowalsky", page_icon="🐧", layout="centered")
+# --- Minimal CSS ---
+st.markdown(
+    """
+    <style>
+    body {
+        background-color: #0e1117;
+        color: #ffffff;
+    }
+    .stApp {
+        background-color: #0e1117;
+    }
+    .stTextInput textarea, .stTextArea textarea, .stButton > button {
+        background-color: #1e1e1e !important;
+        color: white !important;
+        border: 1px solid #333 !important;
+    }
+    .stSidebar {
+        background-color: #111;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
---- Custom minimal dark style ---
-
-st.markdown("""
-<style>
-body, [data-testid="stAppViewContainer"] {
-background-color: #0b0b0b;
-color: white;
-}
-.stButton>button {
-background-color: #1a1a1a;
-color: white;
-border: 1px solid #333;
-border-radius: 6px;
-padding: 0.4em 1em;
-}
-.stTextInput>div>div>input, textarea, .stTextArea>div>div>textarea {
-background-color: #111 !important;
-color: white !important;
-border: 1px solid #333 !important;
-}
-.stMarkdown, .stText, .stCaption {
-color: white;
-}
-</style>
-""", unsafe_allow_html=True)
-
---- Utility functions ---
-
+# --- Utility Functions ---
 def get_time():
-return datetime.now().strftime("%I:%M:%S %p")
+    return datetime.now().strftime("%I:%M:%S %p")
 
 def get_date():
-return datetime.now().strftime("%B %d, %Y")
+    return datetime.now().strftime("%B %d, %Y")
 
 def get_local_ip():
-try:
-s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-s.connect(("8.8.8.8", 80))
-ip = s.getsockname()[0]
-s.close()
-return ip
-except Exception:
-return "Unavailable"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except Exception:
+        return "Unavailable"
 
 def get_public_ip():
-try:
-with urllib.request.urlopen("https://api.ipify.org?format=json
-", timeout=5) as resp:
-data = json.load(resp)
-return data.get("ip", "Unknown")
-except Exception:
-return "Unavailable"
+    try:
+        with urllib.request.urlopen("https://api.ipify.org?format=json", timeout=5) as resp:
+            data = json.load(resp)
+            return data.get("ip", "Unknown")
+    except Exception:
+        return "Unavailable"
 
 def make_qr(data):
-qr = qrcode.QRCode(version=1, box_size=10, border=4)
-qr.add_data(data)
-qr.make(fit=True)
-img = qr.make_image(fill_color="white", back_color="black")
-buf = io.BytesIO()
-img.save(buf, format="PNG")
-return buf.getvalue()
+    qr = qrcode.QRCode(version=1, box_size=10, border=4)
+    qr.add_data(data)
+    qr.make(fit=True)
+    img = qr.make_image(fill_color="white", back_color="black")
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return buf.getvalue()
 
-def chat_with_cowalsky(user_input, image_bytes=None):
-messages = [
-{"role": "system", "content": "You are Cowalsky, a witty, intelligent penguin assistant who answers clearly and kindly."},
-{"role": "user", "content": user_input}
-]
+def generate_image(prompt):
+    try:
+        response = client.images.generate(
+            model="gpt-image-1",
+            prompt=prompt,
+            size="512x512"
+        )
+        image_base64 = response.data[0].b64_json
+        return base64.b64decode(image_base64)
+    except Exception:
+        return None
 
-if image_bytes:
-    image_base64 = base64.b64encode(image_bytes).decode("utf-8")
-    messages.append({
-        "role": "user",
-        "content": [
-            {"type": "text", "text": user_input},
-            {"type": "image_url", "image_url": f"data:image/png;base64,{image_base64}"}
-        ]
-    })
+def analyze_image(image_file, user_prompt):
+    try:
+        base64_img = base64.b64encode(image_file.read()).decode("utf-8")
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are Cowalsky, a clever and cute penguin assistant who helps users analyze and describe images."},
+                {"role": "user", "content": [
+                    {"type": "text", "text": user_prompt},
+                    {"type": "image_url", "image_url": f"data:image/png;base64,{base64_img}"}
+                ]}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Error analyzing image: {e}"
 
-try:
-    response = client.chat.completions.create(model="gpt-4o-mini", messages=messages)
-    return response.choices[0].message.content
-except Exception as e:
-    return f"⚠️ Error: {e}"
+def chat_with_cowalsky(user_input):
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are Cowalsky, a cute and clever penguin assistant who replies helpfully and humorously."},
+                {"role": "user", "content": user_input}
+            ]
+        )
+        return response.choices[0].message.content
+    except Exception as e:
+        return f"⚠️ Error: {e}"
 
---- Header ---
+# --- App Layout ---
+st.title("🐧 Cowalsky the Penguin Assistant")
+st.caption("Minimalistic Penguin AI Helper · Powered by OpenAI")
 
-st.title("🐧 Cowalsky the Penguin")
-st.caption("Simple. Smart. Minimal.")
-
---- Sidebar ---
-
+# --- Sidebar Tools ---
 with st.sidebar:
-st.header("Quick Tools")
+    st.header("🧰 Tools")
 
-col1, col2 = st.columns(2)
-with col1:
     if st.button("🕒 Time"):
-        st.success(get_time())
-with col2:
+        st.success(f"Current Time: {get_time()}")
+
     if st.button("📅 Date"):
-        st.success(get_date())
+        st.success(f"Today: {get_date()}")
 
-if st.button("🏠 Local IP"):
-    st.info(get_local_ip())
-if st.button("🌐 Public IP"):
-    st.info(get_public_ip())
+    if st.button("🏠 Local IP"):
+        st.info(f"Local IP: {get_local_ip()}")
 
+    if st.button("🌐 Public IP"):
+        st.info(f"Public IP: {get_public_ip()}")
+
+    st.divider()
+    st.subheader("🧾 Generate QR Code")
+    qr_data = st.text_input("Enter text or URL:")
+    if st.button("Generate QR"):
+        if qr_data.strip():
+            qr_img = make_qr(qr_data)
+            st.image(qr_img, caption="Generated QR Code", use_column_width=True)
+            st.download_button("Download", qr_img, "cowalsky_qr.png")
+        else:
+            st.warning("Please enter some text.")
+
+    st.divider()
+    st.subheader("🎨 Generate Image")
+    img_prompt = st.text_input("Enter image prompt:")
+    if st.button("Generate Image"):
+        with st.spinner("Drawing your image..."):
+            img_data = generate_image(img_prompt)
+            if img_data:
+                st.image(img_data, caption="Generated by Cowalsky", use_column_width=True)
+                st.download_button("Download", img_data, "cowalsky_image.png")
+            else:
+                st.error("Failed to generate image.")
+
+# --- Image Analysis Section ---
 st.divider()
-st.subheader("QR Code Generator")
-qr_data = st.text_input("Enter text or URL:")
-if st.button("Generate QR"):
-    if qr_data.strip():
-        qr_img = make_qr(qr_data)
-        st.image(qr_img, caption="Generated QR Code", use_column_width=True)
-        st.download_button("Download QR", qr_img, file_name="cowalsky_qr.png")
-    else:
-        st.warning("Please enter text or URL first.")
+st.subheader("🖼️ Upload Image for Analysis")
+uploaded_img = st.file_uploader("Upload an image (JPG, PNG)", type=["jpg", "jpeg", "png"])
+user_prompt = st.text_input("Ask Cowalsky about this image:")
 
---- Chat Section ---
+if uploaded_img and st.button("Analyze Image"):
+    with st.spinner("Analyzing image..."):
+        result = analyze_image(uploaded_img, user_prompt)
+        st.markdown(f"**🐧 Cowalsky:** {result}")
 
+# --- Chat Section ---
 st.divider()
 st.subheader("💬 Chat with Cowalsky")
-
-uploaded_image = st.file_uploader("Optional: Upload an image (PNG/JPG)", type=["png", "jpg", "jpeg"])
-user_message = st.text_area("You:", placeholder="Ask Cowalsky something...")
+user_message = st.text_input("You:", placeholder="Ask Cowalsky anything...")
 
 if st.button("Send"):
-if not user_message.strip():
-st.warning("Please type a message.")
-else:
-with st.spinner("🐧 Thinking..."):
-img_bytes = uploaded_image.read() if uploaded_image else None
-reply = chat_with_cowalsky(user_message, img_bytes)
-st.markdown(f"🐧 Cowalsky: {reply}")
+    with st.spinner("🐧 Thinking..."):
+        bot_reply = chat_with_cowalsky(user_message)
+        st.markdown(f"**🐧 Cowalsky:** {bot_reply}")
 
 st.markdown("---")
-st.caption("🐧 Powered by OpenAI · Built by Parth & Cowalsky")
+st.caption("🐧 Created by Parth and Cowalsky · Powered by OpenAI")
+
