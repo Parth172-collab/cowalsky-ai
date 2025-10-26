@@ -180,4 +180,4 @@ if uploaded_img and st.button("Analyze Image"):
         st.markdown(f"**🐧 Cowalsky:** {result}")
 
 st.markdown("---")
-st.caption("🐧 Created by Parth and Cowalsky · Powered by OpenAI")
+st.caption("🐧 Created by Parth , Arnav , Aarav and Cowalsky · Powered by OpenAI")
