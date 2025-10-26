@@ -14,39 +14,18 @@ import streamlit as st
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# --- Page Configuration ---
-st.set_page_config(
-    page_title="🐧 Cowalsky - Penguin Assistant",
-    page_icon="🐧",
-    layout="centered"
-)
+# --- Page Setup ---
+st.set_page_config(page_title="🐧 Cowalsky", page_icon="🐧", layout="centered")
 
-# --- Minimalistic CSS ---
-st.markdown(
-    """
-    <style>
-    body, .stApp {
-        background-color: #0e1117;
-        color: white;
-    }
-    .stTextInput > div > div > input {
-        background-color: #1e1e1e;
-        color: white;
-        border: 1px solid #333;
-    }
-    .stButton > button {
-        background-color: #1e1e1e;
-        color: white;
-        border: 1px solid #333;
-        width: 100%;
-    }
-    .stSidebar {
-        background-color: #111;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True
-)
+# --- Minimal CSS ---
+st.markdown("""
+<style>
+body, .stApp { background-color: #0e1117; color: white; }
+.stTextInput > div > div > input { background-color: #1e1e1e; color: white; border: 1px solid #333; }
+.stButton > button { background-color: #1e1e1e; color: white; border: 1px solid #333; width:100%; }
+.stSidebar { background-color: #111; }
+</style>
+""", unsafe_allow_html=True)
 
 # --- Utility Functions ---
 def get_time():
@@ -116,7 +95,7 @@ def chat_with_cowalsky(user_input):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are Cowalsky, a witty and smart penguin assistant who replies in a friendly, helpful way."},
+                {"role": "system", "content": "You are Cowalsky, a witty penguin assistant who replies in a friendly, helpful way."},
                 {"role": "user", "content": user_input}
             ]
         )
@@ -127,22 +106,15 @@ def chat_with_cowalsky(user_input):
 # --- App Layout ---
 st.title("🐧 Cowalsky the Penguin Assistant")
 st.caption("Minimalistic Penguin AI Helper · Powered by OpenAI")
+st.divider()
 
 # --- Sidebar Tools ---
 with st.sidebar:
     st.header("🧰 Tools")
-
-    if st.button("🕒 Show Time"):
-        st.success(f"The time is {get_time()}")
-
-    if st.button("📅 Show Date"):
-        st.success(f"Today is {get_date()}")
-
-    if st.button("🏠 Local IP"):
-        st.info(f"Local IP: {get_local_ip()}")
-
-    if st.button("🌐 Public IP"):
-        st.info(f"Public IP: {get_public_ip()}")
+    if st.button("🕒 Show Time"): st.success(f"The time is {get_time()}")
+    if st.button("📅 Show Date"): st.success(f"Today is {get_date()}")
+    if st.button("🏠 Local IP"): st.info(f"Local IP: {get_local_ip()}")
+    if st.button("🌐 Public IP"): st.info(f"Public IP: {get_public_ip()}")
 
     st.divider()
     st.subheader("🧾 Generate QR Code")
@@ -167,38 +139,38 @@ with st.sidebar:
             else:
                 st.error("Failed to generate image.")
 
-# --- Image Analysis Section ---
-st.divider()
-st.subheader("🖼️ Upload Image for Analysis")
-uploaded_img = st.file_uploader("Upload an image (JPG, PNG)", type=["jpg", "jpeg", "png"])
-user_prompt = st.text_input("Ask Cowalsky about this image:")
-
-if uploaded_img and st.button("Analyze Image"):
-    with st.spinner("Analyzing image..."):
-        result = analyze_image(uploaded_img, user_prompt)
-        st.markdown(f"**🐧 Cowalsky:** {result}")
-
 # --- Chat Section ---
-st.divider()
 st.subheader("💬 Chat with Cowalsky")
+if "chat_history" not in st.session_state: st.session_state.chat_history = []
 
-if "chat_input" not in st.session_state:
-    st.session_state.chat_input = ""
-
-# Input box
-chat_col1, chat_col2 = st.columns([4, 1])
+chat_col1, chat_col2 = st.columns([4,1])
 with chat_col1:
-    chat_input = st.text_input("You:", value=st.session_state.chat_input, placeholder="Ask Cowalsky anything...")
+    chat_input = st.text_input("You:", placeholder="Ask Cowalsky anything...")
 with chat_col2:
     send_btn = st.button("Send")
 
 if send_btn and chat_input.strip():
     with st.spinner("🐧 Thinking..."):
         bot_reply = chat_with_cowalsky(chat_input)
-        st.markdown(f"**🐧 Cowalsky:** {bot_reply}")
-    # Clear the input box after sending
+    st.session_state.chat_history.append(("You", chat_input))
+    st.session_state.chat_history.append(("🐧 Cowalsky", bot_reply))
     st.session_state.chat_input = ""
-    st.rerun()
+    st.experimental_rerun()  # refresh to clear input but keep chat
+
+# Display chat history
+for sender, message in st.session_state.chat_history:
+    st.markdown(f"**{sender}:** {message}")
+
+# --- Image Analysis Section ---
+st.divider()
+st.subheader("🖼️ Upload Image for Analysis")
+uploaded_img = st.file_uploader("Upload an image (JPG, PNG)", type=["jpg","jpeg","png"])
+image_prompt = st.text_input("Ask Cowalsky about this image:")
+
+if uploaded_img and st.button("Analyze Image"):
+    with st.spinner("Analyzing image..."):
+        result = analyze_image(uploaded_img, image_prompt)
+        st.markdown(f"**🐧 Cowalsky:** {result}")
 
 st.markdown("---")
 st.caption("🐧 Created by Parth and Cowalsky · Powered by OpenAI")
