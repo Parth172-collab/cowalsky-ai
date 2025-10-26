@@ -17,13 +17,14 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # --- Page Setup ---
 st.set_page_config(page_title="🐧 Cowalsky", page_icon="🐧", layout="centered")
 
-# --- Minimal CSS ---
+# --- Minimal CSS + Scrollable Chat ---
 st.markdown("""
 <style>
 body, .stApp { background-color: #0e1117; color: white; }
 .stTextInput > div > div > input { background-color: #1e1e1e; color: white; border: 1px solid #333; }
 .stButton > button { background-color: #1e1e1e; color: white; border: 1px solid #333; width:100%; }
 .stSidebar { background-color: #111; }
+.chat-container { max-height: 400px; overflow-y: auto; border: 1px solid #333; padding: 10px; background-color: #1a1a1a; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -161,12 +162,13 @@ if send_btn and chat_input_val and chat_input_val.strip() != "":
         bot_reply = chat_with_cowalsky(chat_input_val)
     st.session_state.chat_history.append(("You", chat_input_val))
     st.session_state.chat_history.append(("🐧 Cowalsky", bot_reply))
-    # Clear input box
-    st.session_state.chat_input = ""
+    st.session_state.chat_input = ""  # Clear input
 
-# Display chat history
-for sender, message in st.session_state.chat_history:
+# Display chat history in scrollable container, newest on top
+st.markdown('<div class="chat-container">', unsafe_allow_html=True)
+for sender, message in reversed(st.session_state.chat_history):
     st.markdown(f"**{sender}:** {message}")
+st.markdown('</div>', unsafe_allow_html=True)
 
 # --- Image Analysis Section ---
 st.divider()
@@ -177,6 +179,8 @@ image_prompt = st.text_input("Ask Cowalsky about this image:")
 if uploaded_img and st.button("Analyze Image"):
     with st.spinner("Analyzing image..."):
         result = analyze_image(uploaded_img, image_prompt)
-        # Append image analysis to chat history
         st.session_state.chat_history.append(("You (image)", image_prompt))
         st.session_state.chat_history.append(("🐧 Cowalsky", result))
+
+st.divider()
+st.caption("Made by Parth, Arnav, Aarav")
