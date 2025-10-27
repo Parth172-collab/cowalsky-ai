@@ -101,9 +101,11 @@ def analyze_image(uploaded_file, question):
     except Exception as e:
         return f"⚠️ Error analyzing image: {e}"
 
-# --- Initialize chat memory ---
+# --- Initialize session state ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "chat_input" not in st.session_state:
+    st.session_state.chat_input = ""
 
 # --- Header ---
 st.title("🐧 Cowalsky - Your Penguin Assistant")
@@ -114,18 +116,21 @@ st.subheader("💬 Chat with Cowalsky")
 
 chat_col1, chat_col2 = st.columns([4, 1])
 with chat_col1:
-    user_input = st.text_input("Type your message:", value="", placeholder="Ask me anything...")
+    user_input = st.text_input("Type your message:", key="chat_input", placeholder="Ask me anything...")
 with chat_col2:
     send_btn = st.button("Send")
 
-if send_btn and user_input.strip():
-    bot_reply = chat_with_cowalsky(user_input)
-    st.session_state.chat_history.insert(0, ("You", user_input))
-    st.session_state.chat_history.insert(0, ("🐧 Cowalsky", bot_reply))
-    # Clear input after sending
-    st.experimental_rerun()
+if send_btn and st.session_state.chat_input.strip():
+    user_msg = st.session_state.chat_input.strip()
+    bot_reply = chat_with_cowalsky(user_msg)
 
-# Display chat history (newest first)
+    st.session_state.chat_history.insert(0, ("You", user_msg))
+    st.session_state.chat_history.insert(0, ("🐧 Cowalsky", bot_reply))
+
+    # Safely clear the input box
+    st.session_state.chat_input = ""
+
+# Display chat history
 for sender, msg in st.session_state.chat_history:
     st.markdown(f"**{sender}:** {msg}")
 
@@ -162,4 +167,3 @@ if st.button("Generate Image"):
 # --- Footer ---
 st.markdown("---")
 st.caption("🐧 Made by Parth, Arnav, Aarav")
-
