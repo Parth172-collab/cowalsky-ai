@@ -2,6 +2,7 @@ import os
 import socket
 import urllib.request
 import json
+import base64
 from datetime import datetime
 from dotenv import load_dotenv
 from openai import OpenAI
@@ -27,7 +28,7 @@ h1, h2, h3, h4, h5, h6 { color: white; }
 </style>
 """, unsafe_allow_html=True)
 
-# --- Utilities ---
+# --- Utility functions ---
 def get_time():
     return datetime.now().strftime("%I:%M %p")
 
@@ -58,7 +59,7 @@ def chat_with_cowalsky(user_input):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are Cowalsky, a cute, clever, minimalistic penguin assistant who responds helpfully and humorously."},
+                {"role": "system", "content": "You are Cowalsky, a cute and clever penguin assistant who is helpful and funny."},
                 {"role": "user", "content": user_input}
             ]
         )
@@ -66,10 +67,9 @@ def chat_with_cowalsky(user_input):
     except Exception as e:
         return f"⚠️ Error: {e}"
 
-# --- NanoBanana Text-to-Image ---
+# --- NanoBanana Free Text-to-Image ---
 def generate_image_nanobanana(prompt):
     try:
-        # Pollinations (NanoBanana) endpoint
         url = f"https://image.pollinations.ai/prompt/{urllib.parse.quote(prompt)}"
         response = requests.get(url, timeout=60)
         if response.status_code == 200:
@@ -87,7 +87,7 @@ def analyze_image(uploaded_file, question):
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are Cowalsky, a penguin that can analyze images."},
+                {"role": "system", "content": "You are Cowalsky, a penguin that can analyze images cleverly."},
                 {
                     "role": "user",
                     "content": [
@@ -112,16 +112,20 @@ st.caption("Minimal, Fast, and Cool ❄️")
 # --- Chat Section ---
 st.subheader("💬 Chat with Cowalsky")
 
-user_input = st.text_input("Type your message:", key="chat_input")
-send_btn = st.button("Send")
+chat_col1, chat_col2 = st.columns([4, 1])
+with chat_col1:
+    user_input = st.text_input("Type your message:", value="", placeholder="Ask me anything...")
+with chat_col2:
+    send_btn = st.button("Send")
 
 if send_btn and user_input.strip():
     bot_reply = chat_with_cowalsky(user_input)
     st.session_state.chat_history.insert(0, ("You", user_input))
     st.session_state.chat_history.insert(0, ("🐧 Cowalsky", bot_reply))
-    st.session_state.chat_input = ""  # clear input
+    # Clear input after sending
+    st.experimental_rerun()
 
-# Display chat (newest first)
+# Display chat history (newest first)
 for sender, msg in st.session_state.chat_history:
     st.markdown(f"**{sender}:** {msg}")
 
@@ -158,3 +162,4 @@ if st.button("Generate Image"):
 # --- Footer ---
 st.markdown("---")
 st.caption("🐧 Made by Parth, Arnav, Aarav")
+
