@@ -104,33 +104,36 @@ def analyze_image(uploaded_file, question):
 # --- Initialize session state ---
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
-if "chat_input" not in st.session_state:
-    st.session_state.chat_input = ""
 
 # --- Header ---
 st.title("🐧 Cowalsky - Your Penguin Assistant")
 st.caption("Minimal, Fast, and Cool ❄️")
+
+# --- Clear chat button ---
+if st.button("🧹 Clear Chat"):
+    st.session_state.chat_history = []
+    st.success("Chat cleared!")
 
 # --- Chat Section ---
 st.subheader("💬 Chat with Cowalsky")
 
 chat_col1, chat_col2 = st.columns([4, 1])
 with chat_col1:
-    user_input = st.text_input("Type your message:", key="chat_input", placeholder="Ask me anything...")
+    user_input = st.text_input("Type your message:", key="user_message", placeholder="Ask me anything...")
 with chat_col2:
     send_btn = st.button("Send")
 
-if send_btn and st.session_state.chat_input.strip():
-    user_msg = st.session_state.chat_input.strip()
+if send_btn and user_input.strip():
+    user_msg = user_input.strip()
     bot_reply = chat_with_cowalsky(user_msg)
 
     st.session_state.chat_history.insert(0, ("You", user_msg))
     st.session_state.chat_history.insert(0, ("🐧 Cowalsky", bot_reply))
 
-    # Safely clear the input box
-    st.session_state.chat_input = ""
+    # Clear input using Streamlit native method
+    st.session_state.user_message = ""
 
-# Display chat history
+# Display chat history (latest at top)
 for sender, msg in st.session_state.chat_history:
     st.markdown(f"**{sender}:** {msg}")
 
