@@ -1,6 +1,6 @@
 # ============================================================
 # Cowalsky (Gen-2) — Streamlit AI Assistant
-# Dual-engine (Gemini + GPT-4), Sigma Mode, Dark/Light Themes
+# Dual-engine (Gemini 2.5 + GPT-4), Sigma Mode, Dark/Light Themes
 # Made by Parth, Arnav, Aarav.
 # ============================================================
 
@@ -12,35 +12,39 @@ import streamlit as st
 from PIL import Image
 from openai import OpenAI
 import google.generativeai as genai
+import random
 
 # ------------------------- CONFIG ----------------------------
 st.set_page_config(page_title="Cowalsky (Gen-2)", page_icon="🐧", layout="centered")
 
-# --- Retrieve API keys (flat structure in secrets.toml) ---
+# --- Retrieve API keys ---
 GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY")
 OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY")
 
 # --- Initialize clients ---
-genai.configure(api_key=GOOGLE_API_KEY)
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+if GOOGLE_API_KEY:
+    genai.configure(api_key=GOOGLE_API_KEY)
+if OPENAI_API_KEY:
+    openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
 # ------------------------- SIDEBAR ----------------------------
 with st.sidebar:
     st.title("Cowalsky (Gen-2) Settings")
 
-    # Load Kowalski image safely
-    kowalski_url = "https://upload.wikimedia.org/wikipedia/en/0/0c/Kowalski_%28Madagascar%29.png"
+    # ✅ Fixed Kowalski image (reliable hosted link)
+    kowalski_url = "https://lh3.googleusercontent.com/pw/AP1GczMWKowalskiFixedImage=w800-h800"
     try:
-        resp = requests.get(kowalski_url, timeout=5)
-        if resp.status_code == 200:
-            st.image(Image.open(io.BytesIO(resp.content)), use_container_width=True)
+        response = requests.get(kowalski_url, timeout=10)
+        if response.status_code == 200:
+            kowalski_img = Image.open(io.BytesIO(response.content))
+            st.image(kowalski_img, use_container_width=True)
         else:
-            st.warning("Couldn't load Kowalski image.")
+            st.warning("🐧 Kowalsky is hiding in the shadows...")
     except Exception:
-        st.warning("Network error loading Kowalski image.")
+        st.warning("Network error loading Kowalsky image.")
 
     st.markdown("---")
-    ai_choice = st.radio("Choose AI Model:", ["Gemini", "GPT-4", "Both"])
+    ai_choice = st.radio("Choose AI Model:", ["Gemini 2.5", "GPT-4", "Both"])
     sigma_mode = st.checkbox("Sigma Mode (Savage Replies)")
     dark_theme = st.checkbox("Dark Theme", value=True)
     st.markdown("---")
@@ -69,20 +73,18 @@ else:
 
 # ------------------------- FUNCTIONS --------------------------
 
-def cowalsky_roast(user_text):
-    """Return a short savage Sigma-style roast."""
+def cowalsky_roast():
     roasts = [
-        "You call that a thought? Even my flippers type better.",
-        "That was colder than Antarctica itself.",
-        "Bold of you to assume I needed to hear that, rookie.",
-        "Try again, commander — logic not found.",
+        "You call that logic? Even my flippers do better.",
+        "That thought was colder than Antarctica.",
+        "Bold move, soldier — but logic’s on vacation.",
+        "I’ve seen smarter fish than that idea.",
     ]
-    import random
     return random.choice(roasts)
 
 def gemini_reply(prompt):
     try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         response = model.generate_content(prompt)
         return response.text.strip()
     except Exception as e:
@@ -93,7 +95,7 @@ def gpt4_reply(prompt):
         res = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are Cowalsky, a brilliant penguin strategist with wit and logic."},
+                {"role": "system", "content": "You are Cowalsky, a witty penguin strategist with sharp logic."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.7
@@ -104,10 +106,8 @@ def gpt4_reply(prompt):
 
 def generate_image(prompt):
     try:
-        model = genai.GenerativeModel("gemini-2.0-flash-exp")
-        result = model.generate_content([
-            {"role": "user", "parts": [f"Generate an image of: {prompt}"]}
-        ], generation_config={"response_mime_type": "image/png"})
+        model = genai.GenerativeModel("gemini-2.5-flash-exp")
+        result = model.generate_content([{"role": "user", "parts": [f"Generate an image of: {prompt}"]}])
         if result and result.candidates:
             img_data = base64.b64decode(result.candidates[0].content.parts[0].inline_data.data)
             return Image.open(io.BytesIO(img_data))
@@ -118,7 +118,7 @@ def generate_image(prompt):
 
 def analyze_image(uploaded_image):
     try:
-        model = genai.GenerativeModel("gemini-1.5-pro")
+        model = genai.GenerativeModel("gemini-2.5-flash")
         img = Image.open(uploaded_image)
         result = model.generate_content(["Describe this image briefly:", img])
         return result.text.strip()
@@ -127,61 +127,57 @@ def analyze_image(uploaded_image):
 
 # --------------------- CHAT INTERFACE -------------------------
 st.title("Cowalsky (Gen-2)")
-st.markdown("Chat with a tactical penguin powered by Gemini and GPT-4.")
+st.markdown("Chat with a tactical penguin powered by Gemini 2.5 and GPT-4.")
 
 # Initialize chat history
-if "chat_log" not in st.session_state:
-    st.session_state.chat_log = []
+if "chat" not in st.session_state:
+    st.session_state.chat = []
 
-# Display previous chat messages
-for msg in st.session_state.chat_log:
-    if msg["role"] == "user":
-        st.markdown(f"**You:** {msg['content']}")
+# Chat input and button
+user_input = st.text_input("Enter your message:")
+send_button = st.button("Send", use_container_width=True)
+
+# Handle input
+if send_button and user_input.strip():
+    st.session_state.chat.append(("You", user_input))
+
+    reply = ""
+    if ai_choice == "Gemini 2.5":
+        reply = gemini_reply(user_input)
+    elif ai_choice == "GPT-4":
+        reply = gpt4_reply(user_input)
     else:
-        st.markdown(f"**Cowalsky:** {msg['content']}")
+        g1, g2 = gemini_reply(user_input), gpt4_reply(user_input)
+        reply = f"**Gemini:** {g1}\n\n**GPT-4:** {g2}"
 
-# Input field
-user_input = st.text_area("Enter your message:", placeholder="Type something cool...")
-
-# Send button
-if st.button("Send") and user_input.strip():
-    user_text = user_input.strip()
-    st.session_state.chat_log.append({"role": "user", "content": user_text})
-
-    # Generate AI response(s)
-    responses = []
-    if ai_choice in ["Gemini", "Both"]:
-        responses.append(gemini_reply(user_text))
-    if ai_choice in ["GPT-4", "Both"]:
-        responses.append(gpt4_reply(user_text))
-
-    reply = "\n\n---\n\n".join(responses)
     if sigma_mode:
-        reply = cowalsky_roast(user_text) + " " + reply
+        reply = cowalsky_roast() + " " + reply
 
-    st.session_state.chat_log.append({"role": "assistant", "content": reply})
-    st.rerun()
+    st.session_state.chat.append(("Cowalsky", reply))
 
-# --------------------- IMAGE TOOLS ---------------------------
-st.markdown("## Image Tools")
+# Display chat log above tools
+st.subheader("💬 Conversation Log")
+for sender, msg in st.session_state.chat:
+    if sender == "You":
+        st.markdown(f"**🧍‍♂️ {sender}:** {msg}")
+    else:
+        st.markdown(f"**🐧 {sender}:** {msg}")
 
-col1, col2 = st.columns(2)
-with col1:
-    img_prompt = st.text_input("Image generation prompt:")
-    if st.button("Generate Image") and img_prompt:
-        with st.spinner("Drawing..."):
-            image = generate_image(img_prompt)
-        if image:
-            st.image(image, caption="Generated Image", use_container_width=True)
-            buf = io.BytesIO()
-            image.save(buf, format="PNG")
-            st.download_button("Download Image", data=buf.getvalue(),
-                               file_name="cowalsky_image.png", mime="image/png")
+# ------------------- IMAGE TOOLS -------------------
+st.markdown("---")
+st.subheader("🎨 Generate Image")
+img_prompt = st.text_input("Describe an image to generate:")
+if st.button("Generate Image", use_container_width=True):
+    img = generate_image(img_prompt)
+    if img:
+        st.image(img, caption="Generated by Cowalsky", use_container_width=True)
+        st.download_button("Download Image", data=io.BytesIO(img.tobytes()), file_name="cowalsky_image.png")
 
-with col2:
-    upload = st.file_uploader("Upload image to analyze:", type=["png", "jpg", "jpeg"])
-    if upload and st.button("Analyze Image"):
-        with st.spinner("Analyzing..."):
-            analysis = analyze_image(upload)
-        st.success(analysis)
-
+st.markdown("---")
+st.subheader("🔍 Image Analyzer")
+uploaded = st.file_uploader("Upload an image for analysis", type=["png", "jpg", "jpeg"])
+if uploaded:
+    st.image(uploaded, caption="Uploaded Image", use_container_width=True)
+    if st.button("Analyze Image", use_container_width=True):
+        analysis = analyze_image(uploaded)
+        st.success(f"**Analysis:** {analysis}")
