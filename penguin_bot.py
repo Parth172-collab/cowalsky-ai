@@ -1,201 +1,118 @@
+# ============================================================
+# Cowalsky (Gen-2) - A Streamlit App with Gemini AI
+# ============================================================
+
 import os
 import io
 import base64
+import requests
 from dotenv import load_dotenv
-from openai import OpenAI
-import streamlit as st
-from PIL import Image
 from google import genai
-
-# ==========================
-# Load environment variables
-# ==========================
-load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-# ==========================
-# API Clients
-# ==========================
-gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
-
-# ==========================
-# Streamlit Page Setup
-# ==========================
-st.set_page_config(page_title="Cowalsky (Gen-2)", page_icon="🐧", layout="wide")
-
-# --- Sidebar ---
-import io, base64
 from PIL import Image
+import streamlit as st
 
-# ✅ Verified base64 Kowalski image (loads correctly in Streamlit)
-kowalski_base64 = (
-    "iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAD"
-    "HUlEQVR4nO3dMQ7CMAxFUcP//2a0PZQTVLCmtnjH6UmsBYVvnY97//9nsIABAgQIECBAgAABAs+q"
-    "7q4OAgQIECDwAfqZ2y2oSPbP5L8e2gN/7Y9tNBq4v/H7l+ZjO7Pt2Z6Y/u9U1z73Xhuh7qK0GmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
-    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
-    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
-    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
-)
+# --- Load environment and API key ---
+load_dotenv()
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-kowalski_img = Image.open(io.BytesIO(base64.b64decode(kowalski_base64)))
-st.sidebar.image(kowalski_img, caption="Kowalski — The Brains Behind the Ice", use_container_width=True)
+# --- Page Setup ---
+st.set_page_config(page_title="Cowalsky (Gen-2)", layout="centered")
 
-# ==========================
-# Page Title
-# ==========================
-st.title("Cowalsky (Gen-2)")
-st.caption("A witty penguin AI with Sigma intelligence. Analyze, generate, and roast — all in one.")
-
-# ==========================
-# Functions
-# ==========================
-def penguin_personality(reply, sigma=False):
-    if sigma:
-        return f"🐧 Cowalsky: {reply} (That’s colder than Antarctic wind, try harder next time.)"
+# --- Sidebar with Kowalski Image ---
+kowalski_url = "https://upload.wikimedia.org/wikipedia/en/0/0c/Kowalski_%28Madagascar%29.png"
+try:
+    response = requests.get(kowalski_url)
+    if response.status_code == 200:
+        kowalski_img = Image.open(io.BytesIO(response.content))
+        st.sidebar.image(kowalski_img, use_container_width=True)
     else:
-        return f"🐧 Cowalsky: {reply}"
+        st.sidebar.warning("Couldn't load Kowalski image.")
+except Exception as e:
+    st.sidebar.error(f"Image load error: {e}")
 
-def generate_response(prompt, sigma=False):
+st.sidebar.title("Settings")
+sigma_mode = st.sidebar.checkbox("Sigma Mode 😎", value=False)
+
+# --- Model Setup ---
+model_text = genai.GenerativeModel("gemini-1.5-flash")
+model_image = genai.GenerativeModel("gemini-2.0-flash")
+
+# --- Conversation Log Setup ---
+st.title("Cowalsky (Gen-2)")
+if "conversation" not in st.session_state:
+    st.session_state.conversation = []
+
+# --- User Input ---
+user_input = st.text_area("Enter your message:", placeholder="Ask Cowalsky something...")
+
+# --- Functions ---
+def generate_text_response(prompt):
+    """Generate Cowalsky's text reply."""
     try:
-        system_prompt = (
-            "You are Cowalsky, a witty penguin scientist from Madagascar. "
-            "You answer cleverly and humorously. In Sigma mode, you roast the user subtly within the same line."
-        )
-        result = gemini_client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=[system_prompt, prompt]
-        )
-        response = result.text.strip()
-        return penguin_personality(response, sigma)
+        if sigma_mode:
+            prompt = f"You are Cowalsky, a savage sigma penguin from Madagascar. Roast the user humorously in one line: {prompt}"
+        else:
+            prompt = f"You are Cowalsky, the smart penguin from Madagascar. Reply cleverly and politely: {prompt}"
+        response = model_text.generate_content(prompt)
+        return response.text.strip()
     except Exception as e:
-        return f"⚠️ Text generation error: {e}"
+        return f"Error: {e}"
 
 def generate_image(prompt):
+    """Generate an image using Gemini."""
     try:
-        result = openai_client.images.generate(
-            model="gpt-image-1-mini",
-            prompt=prompt,
-            size="1024x1024"
-        )
-        image_base64 = result.data[0].b64_json
-        image_data = base64.b64decode(image_base64)
-        return Image.open(io.BytesIO(image_data))
+        response = model_image.generate_content([prompt])
+        img_data = response.candidates[0].content.parts[0].inline_data.data
+        image = Image.open(io.BytesIO(base64.b64decode(img_data)))
+        return image
     except Exception as e:
         st.error(f"Image generation error: {e}")
         return None
 
 def analyze_image(uploaded_file):
+    """Analyze an uploaded image."""
     try:
-        image_data = uploaded_file.getvalue()
-        img_base64 = base64.b64encode(image_data).decode("utf-8")
-
-        result = gemini_client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=[
-                {"role": "user", "parts": [
-                    {"text": "Analyze this image and describe it like a penguin scientist."},
-                    {"inline_data": {"mime_type": "image/png", "data": img_base64}}
-                ]}
-            ]
-        )
-        return result.text.strip()
+        image = Image.open(uploaded_file)
+        response = model_text.generate_content(["Analyze this image and describe it briefly.", image])
+        return response.text.strip()
     except Exception as e:
-        return f"⚠️ Image analysis error: {e}"
+        return f"Error analyzing image: {e}"
 
-# ==========================
-# Conversation State
-# ==========================
-if "chat_log" not in st.session_state:
-    st.session_state.chat_log = []
+# --- Conversation Log Display ---
+st.subheader("Conversation Log")
+for entry in st.session_state.conversation:
+    st.markdown(f"**You:** {entry['user']}")
+    st.markdown(f"**Cowalsky:** {entry['bot']}")
 
-user_input = st.text_area("Enter your message or prompt:")
-
-if st.button("Generate Text"):
-    if user_input.strip():
-        with st.spinner("Thinking... 🧠"):
-            reply = generate_response(user_input, sigma_mode)
-        st.session_state.chat_log.append(("You", user_input))
-        st.session_state.chat_log.append(("Cowalsky", reply))
-
-# ==========================
-# Display Conversation Log
-# ==========================
-if st.session_state.chat_log:
-    st.subheader("Conversation Log")
-    for speaker, msg in st.session_state.chat_log:
-        if speaker == "You":
-            st.markdown(f"**🧍 You:** {msg}")
-        else:
-            st.markdown(f"**{msg}**")
-
-# ==========================
-# Image Tools
-# ==========================
-uploaded_image = st.file_uploader("Upload an image to analyze (optional)", type=["png", "jpg", "jpeg"])
-
-col1, col2 = st.columns(2)
+# --- Buttons Section ---
+col1, col2, col3 = st.columns(3)
 with col1:
-    img_btn = st.button("Generate Image")
+    if st.button("Send"):
+        if user_input.strip():
+            reply = generate_text_response(user_input)
+            st.session_state.conversation.append({"user": user_input, "bot": reply})
+            st.rerun()
+
 with col2:
-    analyze_btn = st.button("Analyze Image")
+    if st.button("Generate Image"):
+        if user_input.strip():
+            image = generate_image(user_input)
+            if image:
+                st.image(image, caption="Generated Image", use_container_width=True)
+                # Create a downloadable image link
+                buffered = io.BytesIO()
+                image.save(buffered, format="PNG")
+                b64 = base64.b64encode(buffered.getvalue()).decode()
+                href = f'<a href="data:file/png;base64,{b64}" download="cowalsky_image.png">Download Image</a>'
+                st.markdown(href, unsafe_allow_html=True)
 
-if img_btn and user_input.strip():
-    with st.spinner("Generating Image..."):
-        image = generate_image(user_input)
-    if image:
-        st.image(image, caption="Generated Image", use_container_width=True)
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        st.download_button("Download Image", buf.getvalue(), "cowalsky_creation.png", "image/png")
+with col3:
+    uploaded_file = st.file_uploader("Upload Image for Analysis", type=["png", "jpg", "jpeg"])
+    if uploaded_file:
+        analysis = analyze_image(uploaded_file)
+        st.subheader("Image Analysis")
+        st.write(analysis)
 
-if analyze_btn and uploaded_image:
-    with st.spinner("Analyzing like a true penguin scientist..."):
-        analysis = analyze_image(uploaded_image)
-    st.subheader("Image Analysis")
-    st.write(analysis)
-
-# ==========================
-# Credits
-# ==========================
+# --- Credits ---
 st.markdown("---")
 st.caption("Made by Parth, Arnav, Aarav.")
