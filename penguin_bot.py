@@ -1,5 +1,5 @@
 # ============================================================
-# Cowalsky (Gen-2) - Streamlit app (fixed genai.configure)
+# Cowalsky (Gen-2) - Streamlit app with model selection + fixes
 # ============================================================
 
 import os
@@ -10,9 +10,16 @@ from dotenv import load_dotenv
 from PIL import Image
 import streamlit as st
 
-# Correct imports for Gemini + OpenAI
-import google.generativeai as genai
-from openai import OpenAI
+# Safe imports for APIs
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
+try:
+    from openai import OpenAI
+except ImportError:
+    OpenAI = None
 
 # ----------------------------
 # Load environment variables
@@ -21,24 +28,13 @@ load_dotenv()
 GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not GOOGLE_API_KEY:
-    st.error("Missing GOOGLE_API_KEY in environment.")
-if not OPENAI_API_KEY:
-    st.warning("Missing OPENAI_API_KEY in environment — OpenAI fallback may not work.")
-
 # ----------------------------
-# Configure clients
-# ----------------------------
-genai.configure(api_key=GOOGLE_API_KEY)
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
-
-# ----------------------------
-# Streamlit page config
+# Streamlit page setup
 # ----------------------------
 st.set_page_config(page_title="Cowalsky (Gen-2)", page_icon="🐧", layout="wide")
 
 # ----------------------------
-# Sidebar: Kowalski image + controls
+# Sidebar: image + model options
 # ----------------------------
 st.sidebar.title("Kowalski Control Panel")
 
@@ -53,109 +49,127 @@ try:
 except Exception:
     st.sidebar.warning("Could not load Kowalski image (network error).")
 
+# Sigma mode
 sigma_mode = st.sidebar.checkbox("Sigma Mode", value=False)
+
+# Model selection
+model_choice = st.sidebar.radio(
+    "Select AI Engine",
+    ["Gemini only", "GPT-4 only", "Both (auto fallback)"],
+    index=2
+)
+
 st.sidebar.markdown("---")
 st.sidebar.caption("Made by Parth, Arnav, Aarav")
 
 # ----------------------------
-# Models (use available/compatible model ids)
+# Configure API clients safely
 # ----------------------------
-# Use the Flash text model (change if you prefer another available model)
+if genai and GOOGLE_API_KEY:
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+    except Exception as e:
+        st.sidebar.warning(f"Gemini init error: {e}")
+else:
+    st.sidebar.warning("Gemini API not configured.")
+
+if OpenAI and OPENAI_API_KEY:
+    try:
+        openai_client = OpenAI(api_key=OPENAI_API_KEY)
+    except Exception as e:
+        st.sidebar.warning(f"OpenAI init error: {e}")
+else:
+    openai_client = None
+    st.sidebar.warning("OpenAI API not configured.")
+
+# ----------------------------
+# Constants
+# ----------------------------
 TEXT_MODEL = "gemini-2.5-flash"
-# Use Gemini image model name if you want to try Gemini image generation.
-# We'll try Gemini for images first, then fallback to OpenAI if it fails.
 IMAGE_MODEL = "gemini-2.5-flash-image"
 
 # ----------------------------
-# Helpers / Generators
+# Helper Functions
 # ----------------------------
 def penguin_response_text(raw_text: str, sigma: bool) -> str:
-    """Return a single-line Cowalsky reply. If sigma True, include a short roast in the same line."""
     if sigma:
-        roast = " (That’s colder than Antarctic wind — try harder.)"
-        return f"🐧 Cowalsky: {raw_text.strip()}{roast}"
+        return f"🐧 Cowalsky: {raw_text.strip()} (That’s colder than Antarctic wind — try harder.)"
     else:
         return f"🐧 Cowalsky: {raw_text.strip()}"
 
-def generate_text(prompt: str, sigma: bool) -> str:
-    """Generate text via Gemini (with single-line sigma roast if enabled)."""
+def generate_text_gemini(prompt: str, sigma: bool):
     try:
-        system = (
-            "You are Cowalsky, a witty penguin scientist. Answer helpfully and with light penguin humor. "
-            "If Sigma Mode is enabled, append a short roast to the same line."
-        )
-        # Using GenerativeModel interface
         model = genai.GenerativeModel(TEXT_MODEL)
-        response = model.generate_content([system, prompt])
-        text = response.text if hasattr(response, "text") else str(response)
+        response = model.generate_content(
+            ["You are Cowalsky, a witty penguin scientist.", prompt]
+        )
+        return penguin_response_text(response.text, sigma)
+    except Exception as e:
+        raise RuntimeError(f"Gemini text error: {e}")
+
+def generate_text_gpt(prompt: str, sigma: bool):
+    try:
+        result = openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": "You are Cowalsky, a witty penguin scientist."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.7,
+        )
+        text = result.choices[0].message.content
         return penguin_response_text(text, sigma)
     except Exception as e:
-        # fallback: try OpenAI ChatCompletion
-        try:
-            completion = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are Cowalsky, a witty penguin scientist."},
-                    {"role": "user", "content": prompt}
-                ],
-                temperature=0.7
-            )
-            text = completion.choices[0].message.content
-            return penguin_response_text(text, sigma)
-        except Exception as e2:
-            return f"⚠️ Both generators failed: Gemini error: {e}; OpenAI error: {e2}"
+        raise RuntimeError(f"GPT-4 text error: {e}")
 
-def generate_image_gemini(prompt: str):
-    """Try to generate an image using Gemini image model. Returns PIL.Image or raises."""
-    model = genai.GenerativeModel(IMAGE_MODEL)
-    resp = model.generate_content(prompt)
-    # extract base64 from response structure
+def generate_text(prompt: str, sigma: bool, choice: str):
+    if choice == "Gemini only":
+        return generate_text_gemini(prompt, sigma)
+    elif choice == "GPT-4 only":
+        return generate_text_gpt(prompt, sigma)
+    else:
+        try:
+            return generate_text_gemini(prompt, sigma)
+        except Exception:
+            return generate_text_gpt(prompt, sigma)
+
+def generate_image(prompt: str):
+    """Try Gemini first, then OpenAI fallback."""
     try:
+        model = genai.GenerativeModel(IMAGE_MODEL)
+        resp = model.generate_content(prompt)
         b64 = resp.candidates[0].content.parts[0].inline_data.data
         image_bytes = base64.b64decode(b64)
         return Image.open(io.BytesIO(image_bytes))
-    except Exception as e:
-        raise RuntimeError(f"Gemini image parse error: {e}")
-
-def generate_image_openai(prompt: str):
-    """Fallback image generation using OpenAI images API (size 1024x1024)."""
-    try:
-        result = openai_client.images.generate(
-            model="gpt-image-1",
-            prompt=prompt,
-            size="1024x1024"
-        )
-        b64 = result.data[0].b64_json
-        image_bytes = base64.b64decode(b64)
-        return Image.open(io.BytesIO(image_bytes))
-    except Exception as e:
-        raise RuntimeError(f"OpenAI image error: {e}")
-
-def generate_image(prompt: str):
-    """Try Gemini first, then OpenAI fallback. Return PIL.Image or None."""
-    try:
-        return generate_image_gemini(prompt)
     except Exception:
-        try:
-            return generate_image_openai(prompt)
-        except Exception as e:
-            st.error(f"Image generation failed: {e}")
+        if openai_client:
+            try:
+                result = openai_client.images.generate(
+                    model="gpt-image-1",
+                    prompt=prompt,
+                    size="1024x1024"
+                )
+                b64 = result.data[0].b64_json
+                return Image.open(io.BytesIO(base64.b64decode(b64)))
+            except Exception as e2:
+                st.error(f"OpenAI image error: {e2}")
+                return None
+        else:
+            st.error("Image generation failed: no valid API.")
             return None
 
-def analyze_image_with_gemini(uploaded_file):
-    """Send an image to Gemini for analysis (no mime_type field)."""
+def analyze_image(uploaded_file):
+    """Analyze uploaded image using Gemini."""
     try:
         img = Image.open(uploaded_file).convert("RGB")
-        # Create a model instance and pass image as multimodal part
         model = genai.GenerativeModel(TEXT_MODEL)
-        # Many SDKs accept [prompt, image] style; use image directly as second content
         response = model.generate_content(["Describe this image like a penguin scientist.", img])
-        return response.text if hasattr(response, "text") else str(response)
+        return response.text
     except Exception as e:
         return f"Image analysis error: {e}"
 
 # ----------------------------
-# Conversation state & UI
+# Streamlit UI
 # ----------------------------
 if "conversation" not in st.session_state:
     st.session_state.conversation = []
@@ -166,29 +180,30 @@ st.caption("A witty penguin AI — analysis, generation, and optional Sigma roas
 # Input area
 user_input = st.text_area("Enter your message or prompt:")
 
-# Top: Conversation log (above image tools)
+# Conversation log (above image tools)
 st.subheader("Conversation Log")
 if not st.session_state.conversation:
     st.info("No conversation yet — ask Cowalsky something!")
 else:
     for entry in st.session_state.conversation:
-        speaker = entry["speaker"]
-        text = entry["text"]
-        if speaker == "You":
-            st.markdown(f"**🧍 You:** {text}")
+        if entry["speaker"] == "You":
+            st.markdown(f"**🧍 You:** {entry['text']}")
         else:
-            st.markdown(f"**{text}**")
+            st.markdown(f"**{entry['text']}**")
 
-# Controls row
+# Button row
 col1, col2, col3 = st.columns(3)
 with col1:
     if st.button("Send"):
         if user_input.strip():
-            reply = generate_text(user_input, sigma_mode)
-            st.session_state.conversation.append({"speaker": "You", "text": user_input})
-            st.session_state.conversation.append({"speaker": "Cowalsky", "text": reply})
-            # refresh to show updated log
-            st.experimental_rerun()
+            try:
+                reply = generate_text(user_input, sigma_mode, model_choice)
+                st.session_state.conversation.append({"speaker": "You", "text": user_input})
+                st.session_state.conversation.append({"speaker": "Cowalsky", "text": reply})
+                st.experimental_rerun()
+            except Exception as e:
+                st.error(e)
+
 with col2:
     if st.button("Generate Image"):
         if user_input.strip():
@@ -196,23 +211,23 @@ with col2:
                 img = generate_image(user_input)
             if img:
                 st.image(img, caption="Generated Image", use_container_width=True)
-                # Download
                 buf = io.BytesIO()
                 img.save(buf, format="PNG")
                 st.download_button(
-                    label="Download Image",
+                    "Download Image",
                     data=buf.getvalue(),
                     file_name="cowalsky_image.png",
-                    mime="image/png"
+                    mime="image/png",
                 )
+
 with col3:
     uploaded = st.file_uploader("Upload image for analysis", type=["png", "jpg", "jpeg"])
     if uploaded and st.button("Analyze Image"):
         with st.spinner("Analyzing image..."):
-            analysis = analyze_image_with_gemini(uploaded)
+            result = analyze_image(uploaded)
         st.subheader("Image Analysis")
-        st.write(analysis)
+        st.write(result)
 
-# Footer / credits
+# Footer
 st.markdown("---")
-st.caption("Made by Parth, Arnav, Aarav.")
+st.caption("🐧 Made by Parth, Arnav, Aarav — powered by Gemini & GPT-4.")
