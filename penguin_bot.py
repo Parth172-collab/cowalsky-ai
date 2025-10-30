@@ -1,160 +1,154 @@
+# === PenguinBot 🐧 Streamlit App ===
+# --- Imports ---
 import os
-import io
 import base64
-from PIL import Image
 import streamlit as st
-from dotenv import load_dotenv
-from google import genai
 from openai import OpenAI
+from google import genai
+from google.genai import types
+from PIL import Image
+from io import BytesIO
+from dotenv import load_dotenv
 
-# ============================================================
-# Load environment variables
-# ============================================================
+# --- Load environment variables ---
 load_dotenv()
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-if not GOOGLE_API_KEY:
-    st.error("Missing GOOGLE_API_KEY in environment.")
-if not OPENAI_API_KEY:
-    st.warning("Missing OPENAI_API_KEY — image fallback may not work.")
+# --- Initialize Clients ---
+gemini_client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# ============================================================
-# Initialize clients
-# ============================================================
-gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
-openai_client = OpenAI(api_key=OPENAI_API_KEY)
+# --- Streamlit Page Config ---
+st.set_page_config(page_title="🐧 PenguinBot", page_icon="🐧", layout="wide")
 
-# ============================================================
-# Page setup
-# ============================================================
-st.set_page_config(page_title="Cowalsky AI", layout="wide")
-st.sidebar.image("https://i.imgur.com/WlGvO6T.png", use_container_width=True)
-st.sidebar.title("Cowalsky AI")
-st.sidebar.caption("Chat, create, and analyze — powered by Gemini + OpenAI")
-st.sidebar.write("Made by Parth, Arnav, Aarav")
+# --- Sidebar ---
+st.sidebar.image("https://i.imgur.com/2yaf2wb.png", use_container_width=True)
+st.sidebar.title("🐧 PenguinBot Settings")
+theme = st.sidebar.radio("Choose Theme:", ["Light", "Dark"], index=0)
+penguin_mode = st.sidebar.checkbox("🧊 Penguin Talk Mode", value=True)
+st.sidebar.markdown("---")
+st.sidebar.info("Made with ❤️ + 🧊 by PenguinBot")
 
-# ============================================================
-# Functions
-# ============================================================
+# --- Chat Memory ---
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-# --- Generate Text Response ---
-def generate_text(prompt):
-    try:
-        response = gemini_client.models.generate_content(
-            model="models/gemini-2.5-flash",
-            contents=[
-                {
-                    "role": "user",
-                    "parts": [
-                        {"text": f"You are Cowalsky, a witty and intelligent penguin. Reply warmly, with penguin humor.\n\n{prompt}"}
-                    ]
-                }
-            ],
-        )
-        return response.text.strip()
-    except Exception as e:
-        return f"Error generating text: {e}"
+# --- Penguin Response Style ---
+def penguinify(text):
+    if not text:
+        return "Hmm... looks like my flippers slipped! 🐧"
+    if not penguin_mode:
+        return text
+    endings = ["brrr!", "flap-flap!", "slide safe!", "cool as ice!", "stay frosty!"]
+    return f"{text}\n\n– said the penguin, {endings[len(text) % len(endings)]}"
 
-# --- Generate Image ---
+# --- Image Generator ---
 def generate_image(prompt):
     try:
         response = gemini_client.models.generate_content(
-            model="models/gemini-2.5-flash-image",
-            contents=[{"role": "user", "parts": [{"text": prompt}]}],
+            model="gemini-2.0-flash",
+            contents=[prompt],
         )
-        image_base64 = response.parts[0].inline_data.data
-        image_bytes = base64.b64decode(image_base64)
-        return Image.open(io.BytesIO(image_bytes))
+        image_data = response.candidates[0].content.parts[0].inline_data.data
+        img_bytes = base64.b64decode(image_data)
+        return Image.open(BytesIO(img_bytes))
     except Exception as e:
-        st.warning("Gemini image generation failed, trying OpenAI fallback.")
+        st.warning(f"🐧 Gemini hiccup: {e}\nSwitching to OpenAI fallback...")
         try:
             result = openai_client.images.generate(
-                model="gpt-image-1-mini", prompt=prompt, size="512x512"
+                model="gpt-image-1-mini",
+                prompt=prompt,
+                size="512x512"
             )
-            image_base64 = result.data[0].b64_json
-            image_bytes = base64.b64decode(image_base64)
-            return Image.open(io.BytesIO(image_bytes))
+            img_url = result.data[0].url
+            return img_url
         except Exception as e2:
-            st.error(f"Both generators failed: {e2}")
+            st.error(f"❌ Both image generators failed: {e2}")
             return None
 
-# --- Analyze Image ---
-def analyze_image(image, prompt):
+# --- Image Analyzer ---
+def analyze_image(uploaded_image):
     try:
-        img_bytes = io.BytesIO()
-        image.save(img_bytes, format="PNG")
-        img_bytes.seek(0)
+        image_bytes = uploaded_image.getvalue()
+        image_part = types.Part.from_bytes(data=image_bytes, mime_type=uploaded_image.type)
         response = gemini_client.models.generate_content(
-            model="models/gemini-2.5-flash",
-            contents=[
-                {
-                    "role": "user",
-                    "parts": [
-                        {"text": f"Analyze this image like a witty penguin scientist.\n\nTask: {prompt}"},
-                        {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(img_bytes.read()).decode("utf-8")}},
-                    ],
-                }
-            ],
+            model="gemini-2.0-flash",
+            contents=[image_part, "Describe this image in detail like a penguin reviewer."]
         )
-        return response.text.strip()
+        return penguinify(response.text)
     except Exception as e:
-        return f"Error analyzing image: {e}"
+        st.error(f"🐧 Oops, I slipped analyzing that image: {e}")
+        return None
 
-# ============================================================
-# UI Layout
-# ============================================================
-st.title("Cowalsky AI")
-st.caption("Your friendly penguin assistant — powered by Gemini and OpenAI")
+# --- Chatbot Response ---
+def chat_with_penguin(prompt):
+    try:
+        response = gemini_client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[prompt]
+        )
+        return penguinify(response.text)
+    except Exception as e:
+        st.warning(f"Gemini took a dive: {e}\nSwitching to OpenAI fallback...")
+        try:
+            reply = openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return penguinify(reply.choices[0].message.content)
+        except Exception as e2:
+            st.error(f"❌ Both models failed: {e2}")
+            return "Eek! My ice broke, can’t think right now."
 
-tab1, tab2, tab3 = st.tabs(["Chat", "Generate Image", "Image Analyzer"])
+# --- UI Layout ---
+st.title("🐧 PenguinBot")
+st.caption("A chill AI assistant that slides between Gemini & GPT for you!")
 
-# --- Tab 1: Chat ---
-with tab1:
-    prompt = st.text_area("Ask Cowalsky something:", placeholder="Type here...")
-    if st.button("Generate Response"):
-        if prompt.strip():
-            with st.spinner("Cowalsky is thinking..."):
-                reply = generate_text(prompt)
-            st.subheader("Cowalsky says:")
-            st.write(reply)
+user_input = st.text_area("💬 Ask PenguinBot something...", placeholder="Type your question here...")
+
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("Send 🐧"):
+        if user_input.strip():
+            st.session_state.history.append(("You", user_input))
+            penguin_reply = chat_with_penguin(user_input)
+            st.session_state.history.append(("PenguinBot", penguin_reply))
         else:
-            st.warning("Please enter a prompt.")
+            st.warning("Please say something, even penguins need input!")
 
-# --- Tab 2: Image Generator ---
-with tab2:
-    img_prompt = st.text_area("Describe your image idea:", placeholder="Example: a penguin surfing in Hawaii")
-    if st.button("Generate Image"):
-        if img_prompt.strip():
-            with st.spinner("Drawing your masterpiece..."):
-                image = generate_image(img_prompt)
+with col2:
+    prompt_img = st.text_input("🎨 Generate image prompt:")
+    if st.button("Generate Image 🧊"):
+        if prompt_img.strip():
+            image = generate_image(prompt_img)
             if image:
-                st.image(image, caption="Generated Image", use_container_width=True)
-                img_buffer = io.BytesIO()
-                image.save(img_buffer, format="PNG")
-                st.download_button(
-                    "Download Image",
-                    data=img_buffer.getvalue(),
-                    file_name="penguin_art.png",
-                    mime="image/png",
-                )
+                if isinstance(image, str):
+                    st.image(image, caption="Penguin Creation")
+                else:
+                    st.image(image, caption="Penguin Creation")
+                    buffered = BytesIO()
+                    image.save(buffered, format="PNG")
+                    st.download_button(
+                        "⬇️ Download Image",
+                        data=buffered.getvalue(),
+                        file_name="penguin_creation.png",
+                        mime="image/png"
+                    )
+
+uploaded = st.file_uploader("📸 Upload an image for Penguin analysis")
+if uploaded:
+    st.image(uploaded, caption="Your Uploaded Image", use_container_width=True)
+    analysis = analyze_image(uploaded)
+    if analysis:
+        st.info(analysis)
+
+# --- Chat History Display ---
+if st.session_state.history:
+    st.markdown("### 🗨️ Chat History")
+    for sender, msg in st.session_state.history:
+        if sender == "You":
+            st.markdown(f"**🧍 You:** {msg}")
         else:
-            st.warning("Please enter a description.")
+            st.markdown(f"**🐧 PenguinBot:** {msg}")
 
-# --- Tab 3: Image Analyzer ---
-with tab3:
-    uploaded = st.file_uploader("Upload an image to analyze:", type=["png", "jpg", "jpeg"])
-    analyze_prompt = st.text_input("What should Cowalsky analyze?", "Describe what’s happening in this image")
-    if uploaded and st.button("Analyze Image"):
-        image = Image.open(uploaded)
-        st.image(image, caption="Uploaded Image", use_container_width=True)
-        with st.spinner("Cowalsky is observing carefully..."):
-            result = analyze_image(image, analyze_prompt)
-        st.subheader("Analysis Result:")
-        st.write(result)
-
-# ============================================================
-# Footer
-# ============================================================
 st.markdown("---")
-st.markdown("Made by **Parth, Arnav, Aarav**.")
+st.caption("🐧 Powered by Gemini & GPT — where AI meets ice-cool charm.")
