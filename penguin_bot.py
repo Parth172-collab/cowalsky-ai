@@ -1,128 +1,160 @@
-# ============================================================
-# 🐧 Cowalsky PenguinBot - Streamlit + Gemini + OpenAI Fallback
-# ============================================================
-
-# ---------- Imports ----------
 import os
 import io
 import base64
-from dotenv import load_dotenv
 from PIL import Image
 import streamlit as st
-import google.generativeai as genai
+from dotenv import load_dotenv
+from google import genai
 from openai import OpenAI
-import random
 
-# ---------- Environment Setup ----------
+# ============================================================
+# Load environment variables
+# ============================================================
 load_dotenv()
-genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
-# ---------- Streamlit Page Setup ----------
-st.set_page_config(page_title="Cowalsky AI", page_icon="🐧", layout="centered")
+if not GOOGLE_API_KEY:
+    st.error("Missing GOOGLE_API_KEY in environment.")
+if not OPENAI_API_KEY:
+    st.warning("Missing OPENAI_API_KEY — image fallback may not work.")
 
-# ---------- Sidebar ----------
-with st.sidebar:
-    st.image("https://upload.wikimedia.org/wikipedia/commons/0/0f/Penguin_icon.svg", width=120)
-    st.title("Cowalsky AI")
-    st.markdown("### ❄️ Penguin-powered AI companion")
-    st.toggle("🌙 Dark Mode (via Streamlit theme settings)")
-    st.markdown("---")
-    st.caption("Made by Parth, Arnav, Aarav.\nSupports Gemini + OpenAI fallback for reliability!")
+# ============================================================
+# Initialize clients
+# ============================================================
+gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
+openai_client = OpenAI(api_key=OPENAI_API_KEY)
 
-# ---------- Session State ----------
-if "chat_history" not in st.session_state:
-    st.session_state.chat_history = []
+# ============================================================
+# Page setup
+# ============================================================
+st.set_page_config(page_title="Cowalsky AI", layout="wide")
+st.sidebar.image("https://i.imgur.com/WlGvO6T.png", use_container_width=True)
+st.sidebar.title("Cowalsky AI")
+st.sidebar.caption("Chat, create, and analyze — powered by Gemini + OpenAI")
+st.sidebar.write("Made by Parth, Arnav, Aarav")
 
-# ---------- Helper Function: Penguin-style Replies ----------
-def penguin_reply(text: str) -> str:
-    phrases = [
-        "🐧 *flaps wings* That’s quite something!",
-        "❄️ Cool as ice, here’s what I found:",
-        "Brrr... logic this crisp can only come from the poles!",
-        "Sliding into knowledge like it’s fresh snow:"
-    ]
-    preface = random.choice(phrases)
-    return f"{preface}\n\n{text}"
+# ============================================================
+# Functions
+# ============================================================
 
-# ---------- Gemini + OpenAI Fallback ----------
-def generate_text_or_image(prompt, image=None):
+# --- Generate Text Response ---
+def generate_text(prompt):
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        if image:
-            response = model.generate_content([prompt, image])
-        else:
-            response = model.generate_content(prompt)
-        return response.text
+        response = gemini_client.models.generate_content(
+            model="models/gemini-2.5-flash",
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": f"You are Cowalsky, a witty and intelligent penguin. Reply warmly, with penguin humor.\n\n{prompt}"}
+                    ]
+                }
+            ],
+        )
+        return response.text.strip()
     except Exception as e:
-        # Fallback to OpenAI if Gemini quota or failure
-        try:
-            completion = openai_client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "You are Cowalsky, a friendly and witty penguin assistant."},
-                    {"role": "user", "content": prompt},
-                ],
-                temperature=0.7,
-            )
-            return completion.choices[0].message.content
-        except Exception as e2:
-            return f"⚠️ Error: {e2}"
+        return f"Error generating text: {e}"
 
-# ---------- Image Generation ----------
+# --- Generate Image ---
 def generate_image(prompt):
     try:
-        model = genai.GenerativeModel("gemini-2.5-flash")
-        result = model.generate_content(prompt, generation_config={"mime_type": "image/png"})
-        image_data = result._result.response.candidates[0].content.parts[0].inline_data.data
-        image_bytes = base64.b64decode(image_data)
+        response = gemini_client.models.generate_content(
+            model="models/gemini-2.5-flash-image",
+            contents=[{"role": "user", "parts": [{"text": prompt}]}],
+        )
+        image_base64 = response.parts[0].inline_data.data
+        image_bytes = base64.b64decode(image_base64)
         return Image.open(io.BytesIO(image_bytes))
     except Exception as e:
-        st.error(f"Image generation error: {e}")
-        return None
+        st.warning("Gemini image generation failed, trying OpenAI fallback.")
+        try:
+            result = openai_client.images.generate(
+                model="gpt-image-1-mini", prompt=prompt, size="512x512"
+            )
+            image_base64 = result.data[0].b64_json
+            image_bytes = base64.b64decode(image_base64)
+            return Image.open(io.BytesIO(image_bytes))
+        except Exception as e2:
+            st.error(f"Both generators failed: {e2}")
+            return None
 
-# ---------- Input Section ----------
-st.markdown("### Enter your message or image prompt below:")
-user_input = st.text_area("", placeholder="Ask Cowalsky anything...")
-
-col1, col2 = st.columns(2)
-with col1:
-    text_btn = st.button("Generate Text")
-with col2:
-    img_btn = st.button("Generate Image")
-
-# ---------- Text Output ----------
-if text_btn and user_input.strip():
-    with st.spinner("Thinking like a penguin..."):
-        response = generate_text_or_image(user_input)
-    st.subheader("Cowalsky says:")
-    st.write(penguin_reply(response))
-    st.session_state.chat_history.append(("You", user_input))
-    st.session_state.chat_history.append(("Cowalsky", response))
-
-# ---------- Image Output ----------
-if img_btn and user_input.strip():
-    with st.spinner("Drawing ice art..."):
-        image = generate_image(user_input)
-    if image:
-        st.image(image, caption="Nano Banana Creation", use_container_width=True)
-        # Download button
-        buf = io.BytesIO()
-        image.save(buf, format="PNG")
-        byte_im = buf.getvalue()
-        st.download_button(
-            label="Download Image",
-            data=byte_im,
-            file_name="cowalsky_art.png",
-            mime="image/png",
+# --- Analyze Image ---
+def analyze_image(image, prompt):
+    try:
+        img_bytes = io.BytesIO()
+        image.save(img_bytes, format="PNG")
+        img_bytes.seek(0)
+        response = gemini_client.models.generate_content(
+            model="models/gemini-2.5-flash",
+            contents=[
+                {
+                    "role": "user",
+                    "parts": [
+                        {"text": f"Analyze this image like a witty penguin scientist.\n\nTask: {prompt}"},
+                        {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(img_bytes.read()).decode("utf-8")}},
+                    ],
+                }
+            ],
         )
+        return response.text.strip()
+    except Exception as e:
+        return f"Error analyzing image: {e}"
 
-# ---------- Chat History ----------
-if st.session_state.chat_history:
-    st.markdown("### Chat History")
-    for sender, msg in st.session_state.chat_history:
-        st.markdown(f"**{sender}:** {msg}")
+# ============================================================
+# UI Layout
+# ============================================================
+st.title("Cowalsky AI")
+st.caption("Your friendly penguin assistant — powered by Gemini and OpenAI")
 
-# ---------- Footer ----------
+tab1, tab2, tab3 = st.tabs(["Chat", "Generate Image", "Image Analyzer"])
+
+# --- Tab 1: Chat ---
+with tab1:
+    prompt = st.text_area("Ask Cowalsky something:", placeholder="Type here...")
+    if st.button("Generate Response"):
+        if prompt.strip():
+            with st.spinner("Cowalsky is thinking..."):
+                reply = generate_text(prompt)
+            st.subheader("Cowalsky says:")
+            st.write(reply)
+        else:
+            st.warning("Please enter a prompt.")
+
+# --- Tab 2: Image Generator ---
+with tab2:
+    img_prompt = st.text_area("Describe your image idea:", placeholder="Example: a penguin surfing in Hawaii")
+    if st.button("Generate Image"):
+        if img_prompt.strip():
+            with st.spinner("Drawing your masterpiece..."):
+                image = generate_image(img_prompt)
+            if image:
+                st.image(image, caption="Generated Image", use_container_width=True)
+                img_buffer = io.BytesIO()
+                image.save(img_buffer, format="PNG")
+                st.download_button(
+                    "Download Image",
+                    data=img_buffer.getvalue(),
+                    file_name="penguin_art.png",
+                    mime="image/png",
+                )
+        else:
+            st.warning("Please enter a description.")
+
+# --- Tab 3: Image Analyzer ---
+with tab3:
+    uploaded = st.file_uploader("Upload an image to analyze:", type=["png", "jpg", "jpeg"])
+    analyze_prompt = st.text_input("What should Cowalsky analyze?", "Describe what’s happening in this image")
+    if uploaded and st.button("Analyze Image"):
+        image = Image.open(uploaded)
+        st.image(image, caption="Uploaded Image", use_container_width=True)
+        with st.spinner("Cowalsky is observing carefully..."):
+            result = analyze_image(image, analyze_prompt)
+        st.subheader("Analysis Result:")
+        st.write(result)
+
+# ============================================================
+# Footer
+# ============================================================
 st.markdown("---")
-st.caption("Made by Parth, Arnav, Aarav. ❄️ Powered by Gemini & OpenAI.")
+st.markdown("Made by **Parth, Arnav, Aarav**.")
