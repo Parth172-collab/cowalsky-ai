@@ -1,7 +1,4 @@
 streamlit
 google-generativeai
 python-dotenv
-Pillow
-gtts
-SpeechRecognition
-pydub
+pillow
