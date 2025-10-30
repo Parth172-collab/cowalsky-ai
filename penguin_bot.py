@@ -1,5 +1,5 @@
 # ======================================================
-# 🐧 Cowalsky (Gen-2)
+# Cowalsky (Gen-2)
 # AI Chat + Image Generator + Analyzer + Sigma Mode
 # Made by Parth, Arnav, Aarav
 # ======================================================
@@ -15,19 +15,31 @@ import google.generativeai as genai
 
 # ------------------ LOAD API KEYS ---------------------
 load_dotenv()
-GOOGLE_API_KEY = st.secrets.get("GOOGLE_API_KEY", os.getenv("GOOGLE_API_KEY"))
-OPENAI_API_KEY = st.secrets.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+
+# Try Streamlit secrets first, then .env fallback
+GOOGLE_API_KEY = None
+OPENAI_API_KEY = None
+
+if "GOOGLE_API_KEY" in st.secrets:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+elif os.getenv("GOOGLE_API_KEY"):
+    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+
+if "OPENAI_API_KEY" in st.secrets:
+    OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+elif os.getenv("OPENAI_API_KEY"):
+    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 # ------------------ PAGE CONFIG -----------------------
 st.set_page_config(page_title="Cowalsky (Gen-2)", page_icon="🐧", layout="wide")
 st.title("Cowalsky (Gen-2)")
 
 # Sidebar — with Kowalski image
-kowalski_url = "https://raw.githubusercontent.com/Parth2404AI/kowalski-assets/main/kowalski.png"
+kowalski_url = "https://raw.githubusercontent.com/ArnavAnand2009/kowalsky-assets/main/kowalski.png"
 try:
     st.sidebar.image(kowalski_url, use_container_width=True)
-except:
-    st.sidebar.warning("Could not load Kowalski image (check URL or permissions).")
+except Exception as e:
+    st.sidebar.warning(f"Image failed to load: {e}")
 
 st.sidebar.title("Settings")
 
@@ -39,18 +51,18 @@ sigma_mode = st.sidebar.checkbox("Enable Sigma Mode")
 if GOOGLE_API_KEY and len(GOOGLE_API_KEY.strip()) > 20:
     try:
         genai.configure(api_key=GOOGLE_API_KEY.strip())
-        st.sidebar.success("Gemini API ready!")
+        st.sidebar.success("✅ Gemini API configured!")
     except Exception as e:
-        st.sidebar.error(f"Gemini init failed: {e}")
+        st.sidebar.error(f"❌ Gemini init failed: {e}")
 else:
-    st.sidebar.warning("Gemini API key missing!")
+    st.sidebar.warning("⚠️ Gemini API key not found in secrets or .env")
 
 # Configure OpenAI
 try:
     openai_client = OpenAI(api_key=OPENAI_API_KEY)
-    st.sidebar.success("OpenAI API ready!")
+    st.sidebar.success("✅ OpenAI API configured!")
 except Exception as e:
-    st.sidebar.error(f"OpenAI init failed: {e}")
+    st.sidebar.error(f"❌ OpenAI init failed: {e}")
 
 # ------------------ FUNCTIONS -------------------------
 
@@ -59,14 +71,14 @@ def generate_gpt4_response(prompt):
         response = openai_client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
-                {"role": "system", "content": "You are Cowalsky, a witty penguin genius who helps with insight and facts."},
+                {"role": "system", "content": "You are Cowalsky, a smart and witty penguin genius."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.8
         )
         text = response.choices[0].message.content.strip()
         if sigma_mode:
-            text += " 🧊 Cowalsky: You call that a question? Even an iceberg could think faster."
+            text += " 🧊 Cowalsky: That’s cute, but I’ve seen sea lions do better."
         return text
     except Exception as e:
         return f"Error: {e}"
@@ -77,7 +89,7 @@ def generate_gemini_response(prompt):
         result = model.generate_content(prompt)
         text = result.text.strip()
         if sigma_mode:
-            text += " 🧊 Cowalsky: I’ve seen better logic from sea lions."
+            text += " 🧊 Cowalsky: Nice try, genius — even an iceberg has more depth."
         return text
     except Exception as e:
         return f"Error: {e}"
@@ -118,20 +130,15 @@ with conversation_log:
         st.markdown(f"**You:** {msg['user']}")
         st.markdown(f"**Cowalsky:** {msg['bot']}")
 
-# Input area
-user_input = st.text_area("Enter your message:", placeholder="Ask Cowalsky anything...")
-
-# Buttons
-col1, col2, col3 = st.columns(3)
+# Input + Send button
+col1, col2 = st.columns([4, 1])
 with col1:
-    generate_text_btn = st.button("Generate Response")
+    user_input = st.text_area("Enter your message:", placeholder="Talk to Cowalsky...")
 with col2:
-    generate_image_btn = st.button("Generate Image")
-with col3:
-    analyze_image_btn = st.button("Analyze Image")
+    send_btn = st.button("Send")
 
 # ------------------ TEXT GENERATION --------------------
-if generate_text_btn and user_input.strip():
+if send_btn and user_input.strip():
     with st.spinner("Cowalsky thinking..."):
         output_text = ""
         if model_choice == "Gemini":
@@ -148,28 +155,28 @@ if generate_text_btn and user_input.strip():
         st.write(output_text)
 
 # ------------------ IMAGE GENERATION -------------------
-if generate_image_btn and user_input.strip():
+st.subheader("Image Generator")
+img_prompt = st.text_input("Describe the image you want:")
+if st.button("Generate Image") and img_prompt.strip():
     with st.spinner("Cowalsky sketching..."):
-        image = generate_image(user_input)
+        image = generate_image(img_prompt)
     if image:
         st.image(image, caption="Generated Image", use_container_width=True)
-        # Download button
         buf = io.BytesIO()
         image.save(buf, format="PNG")
         st.download_button("Download Image", data=buf.getvalue(), file_name="cowalsky_image.png", mime="image/png")
 
 # ------------------ IMAGE ANALYSIS ---------------------
-if analyze_image_btn:
-    uploaded_image = st.file_uploader("Upload an image to analyze", type=["png", "jpg", "jpeg"])
-    if uploaded_image:
-        question = st.text_input("Ask Cowalsky about this image:")
-        if st.button("Run Analysis"):
-            with st.spinner("Analyzing image..."):
-                analysis_result = analyze_image(uploaded_image, question)
-                st.subheader("Analysis Result")
-                st.write(analysis_result)
+st.subheader("Image Analyzer")
+uploaded_image = st.file_uploader("Upload an image to analyze", type=["png", "jpg", "jpeg"])
+if uploaded_image:
+    question = st.text_input("Ask Cowalsky about this image:")
+    if st.button("Analyze Image"):
+        with st.spinner("Analyzing image..."):
+            analysis_result = analyze_image(uploaded_image, question)
+            st.subheader("Analysis Result")
+            st.write(analysis_result)
 
 # ------------------ FOOTER -----------------------------
 st.markdown("---")
 st.markdown("**Made by Parth, Arnav, Aarav.**")
-
