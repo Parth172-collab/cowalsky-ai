@@ -1,5 +1,5 @@
 streamlit
-Pillow
-python-dotenv
-google-generativeai
 openai
+google-genai
+pillow
+python-dotenv
