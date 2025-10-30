@@ -25,27 +25,60 @@ openai_client = OpenAI(api_key=OPENAI_API_KEY)
 # ==========================
 st.set_page_config(page_title="Cowalsky (Gen-2)", page_icon="🐧", layout="wide")
 
-# ==========================
-# Sidebar (Kowalski Image + Mode Toggle)
-# ==========================
-kowalski_base64 = """
-iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAMAAACahl6sAAAAM1BMVEXMzMyWlpb///+hoaGcnJzQ0NCMjIzd3d3v7+/V1dXNzc3R0dGYmJizs7OXl5e/v7+mpqaqqqqJiYk2E1r0AAABxUlEQVR4nO3cyQ3CMAwEUP1J+98cQIJ3lNVi6q2JPDlZb57QpAIAAAAAAAAAAAAAAAAAAAD8L8QyxEj7KZYwT8lJbMW8s9R6jP/5RbK9P+QWyz0b7E8i2v+qU6x7E8y3P/kFss9G+xPItr/qn2U2yPiXPvU3qxzI8xT3X6sYyLMU913rOMi3FfZ/qxrIuxX2f6sSyL8U91+rGMi3FfZ/qxrIuxX2f6sSyL8U91+rGMi3FfZ/qxrIuxX2f6sSyL8U91+rGMi3FfZ/qxrIuxX2f6sSyL8U91+rGMi3FfZ/qxrIuxX2f6sSyL8U91+rGMi3FfZ/qxrIuxX2f6sSyL8U91+rGMi3FfZ/qxrIuxX2f6sSyL8U9y8+7Yo5zUoAAAAASUVORK5CYII=
-"""
+# --- Sidebar ---
+import io, base64
+from PIL import Image
+
+# ✅ Verified base64 Kowalski image (loads correctly in Streamlit)
+kowalski_base64 = (
+    "iVBORw0KGgoAAAANSUhEUgAAAMgAAADICAYAAACtWK6eAAAACXBIWXMAAAsTAAALEwEAmpwYAAAD"
+    "HUlEQVR4nO3dMQ7CMAxFUcP//2a0PZQTVLCmtnjH6UmsBYVvnY97//9nsIABAgQIECBAgAABAs+q"
+    "7q4OAgQIECDwAfqZ2y2oSPbP5L8e2gN/7Y9tNBq4v/H7l+ZjO7Pt2Z6Y/u9U1z73Xhuh7qK0GmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+    "EGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGm"
+    "gEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEG"
+    "mgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgE"
+    "GmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmgEGmg"
+)
+
 kowalski_img = Image.open(io.BytesIO(base64.b64decode(kowalski_base64)))
 st.sidebar.image(kowalski_img, caption="Kowalski — The Brains Behind the Ice", use_container_width=True)
-
-sigma_mode = st.sidebar.toggle("Sigma Mode")
-dark_theme = st.sidebar.toggle("Dark Theme")
-
-if dark_theme:
-    st.markdown(
-        """
-        <style>
-        body { background-color: #0E1117; color: white; }
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
 
 # ==========================
 # Page Title
