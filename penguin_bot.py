@@ -1,7 +1,7 @@
 # ============================================================
 # Cowalsky (Gen-2) — Streamlit AI Assistant
-# Dual-engine (Gemini 2.5 + GPT-4), Sigma Mode, Dark/Light Themes
-# Made by Parth, Arnav, Aarav.
+# Dual-engine (Gemini 2.5 + GPT-4), Sigma Mode, Dark Mode default
+# Newest replies appear first + spaced conversation layout
 # ============================================================
 
 import os
@@ -31,17 +31,17 @@ if OPENAI_API_KEY:
 with st.sidebar:
     st.title("Cowalsky (Gen-2) Settings")
 
-    # ✅ Fixed Kowalski image (reliable hosted link)
-    kowalski_url = "https://lh3.googleusercontent.com/pw/AP1GczMWKowalskiFixedImage=w800-h800"
+    # ✅ Working Kowalski image (GitHub CDN)
+    kowalski_url = "https://raw.githubusercontent.com/ParthK3107/public-assets/main/kowalski_penguin.png"
     try:
         response = requests.get(kowalski_url, timeout=10)
         if response.status_code == 200:
             kowalski_img = Image.open(io.BytesIO(response.content))
             st.image(kowalski_img, use_container_width=True)
         else:
-            st.warning("🐧 Kowalsky is hiding in the shadows...")
+            st.warning("🐧 Kowalsky is hiding in the shadows... (Image blocked)")
     except Exception:
-        st.warning("Network error loading Kowalsky image.")
+        st.warning("🐧 Kowalsky couldn’t load — probably on a stealth mission.")
 
     st.markdown("---")
     ai_choice = st.radio("Choose AI Model:", ["Gemini 2.5", "GPT-4", "Both"])
@@ -56,23 +56,17 @@ if dark_theme:
         """
         <style>
         body, .stApp { background-color: #0d1117; color: white; }
-        textarea, .stTextInput>div>div>input { background-color: #161b22 !important; color: white !important; }
-        </style>
-        """,
-        unsafe_allow_html=True
-    )
-else:
-    st.markdown(
-        """
-        <style>
-        body, .stApp { background-color: white; color: black; }
+        textarea, .stTextInput>div>div>input {
+            background-color: #161b22 !important;
+            color: white !important;
+        }
+        .chat-bubble { margin-bottom: 20px; }
         </style>
         """,
         unsafe_allow_html=True
     )
 
 # ------------------------- FUNCTIONS --------------------------
-
 def cowalsky_roast():
     roasts = [
         "You call that logic? Even my flippers do better.",
@@ -116,12 +110,18 @@ def generate_image(prompt):
         st.error(f"Image generation error: {e}")
         return None
 
-def analyze_image(uploaded_image):
+# ✅ Enhanced Image Analyzer — with user question
+def analyze_image(uploaded_image, user_question):
     try:
         model = genai.GenerativeModel("gemini-2.5-flash")
-        img = Image.open(uploaded_image)
-        result = model.generate_content(["Describe this image briefly:", img])
-        return result.text.strip()
+        image_bytes = uploaded_image.read()
+        response = model.generate_content([
+            {"role": "user", "parts": [
+                {"text": f"Answer this question about the image: {user_question}"},
+                {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode("utf-8")}}
+            ]}
+        ])
+        return response.text.strip()
     except Exception as e:
         return f"[Image analysis error: {e}]"
 
@@ -129,55 +129,57 @@ def analyze_image(uploaded_image):
 st.title("Cowalsky (Gen-2)")
 st.markdown("Chat with a tactical penguin powered by Gemini 2.5 and GPT-4.")
 
-# Initialize chat history
 if "chat" not in st.session_state:
     st.session_state.chat = []
 
-# Chat input and button
 user_input = st.text_input("Enter your message:")
 send_button = st.button("Send", use_container_width=True)
 
-# Handle input
 if send_button and user_input.strip():
     st.session_state.chat.append(("You", user_input))
-
     reply = ""
     if ai_choice == "Gemini 2.5":
         reply = gemini_reply(user_input)
     elif ai_choice == "GPT-4":
         reply = gpt4_reply(user_input)
     else:
-        g1, g2 = gemini_reply(user_input), gpt4_reply(user_input)
-        reply = f"**Gemini:** {g1}\n\n**GPT-4:** {g2}"
+        reply = f"Gemini: {gemini_reply(user_input)}\n\nGPT-4: {gpt4_reply(user_input)}"
 
     if sigma_mode:
-        reply = cowalsky_roast() + " " + reply
+        reply += "\n\n💀 " + cowalsky_roast()
 
     st.session_state.chat.append(("Cowalsky", reply))
 
-# Display chat log above tools
-st.subheader("💬 Conversation Log")
-for sender, msg in st.session_state.chat:
-    if sender == "You":
-        st.markdown(f"**🧍‍♂️ {sender}:** {msg}")
-    else:
-        st.markdown(f"**🐧 {sender}:** {msg}")
+# --- Display Chat (Newest First + Blank Spacing) ---
+if st.session_state.chat:
+    st.markdown("### Conversation Log")
+    for sender, msg in reversed(st.session_state.chat):  # 👈 newest first
+        st.markdown(f"**{'🐧' if sender == 'Cowalsky' else '🧑'} {sender}:** {msg}")
+        st.markdown("<br>", unsafe_allow_html=True)  # blank spacing
 
-# ------------------- IMAGE TOOLS -------------------
+# --------------------- IMAGE GENERATION -----------------------
 st.markdown("---")
-st.subheader("🎨 Generate Image")
-img_prompt = st.text_input("Describe an image to generate:")
-if st.button("Generate Image", use_container_width=True):
-    img = generate_image(img_prompt)
-    if img:
-        st.image(img, caption="Generated by Cowalsky", use_container_width=True)
-        st.download_button("Download Image", data=io.BytesIO(img.tobytes()), file_name="cowalsky_image.png")
+st.subheader("Image Generation")
+img_prompt = st.text_input("Enter an image prompt:")
+if st.button("Generate Image"):
+    with st.spinner("Drawing like a tactical penguin..."):
+        image = generate_image(img_prompt)
+    if image:
+        st.image(image, caption="Generated by Cowalsky", use_container_width=True)
+        buf = io.BytesIO()
+        image.save(buf, format="PNG")
+        st.download_button("Download Image", buf.getvalue(), "cowalsky_image.png", "image/png")
 
+# --------------------- IMAGE ANALYZER -------------------------
 st.markdown("---")
-st.subheader("🔍 Image Analyzer")
-uploaded = st.file_uploader("Upload an image for analysis", type=["png", "jpg", "jpeg"])
-if uploaded:
-    st.image(uploaded, caption="Uploaded Image", use_container_width=True)
-    if st.button("Analyze Image", use_container_width=True):
-        analysis = analyze_image(uploaded)
-        st.success(f"**Analysis:** {analysis}")
+st.subheader("Image Analyzer")
+
+uploaded_image = st.file_uploader("Upload an image for analysis", type=["png", "jpg", "jpeg"])
+
+if uploaded_image:
+    st.image(uploaded_image, caption="Uploaded Image", use_container_width=True)
+    user_question = st.text_input("Ask something about this image:")
+    if st.button("Analyze Image"):
+        with st.spinner("Analyzing image like a penguin detective..."):
+            answer = analyze_image(uploaded_image, user_question or "Describe this image in detail.")
+        st.markdown(f"**🐧 Cowalsky’s Analysis:** {answer}")
