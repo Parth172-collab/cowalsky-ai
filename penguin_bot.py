@@ -1,144 +1,94 @@
 import os
 import io
 import base64
-import tempfile
 from dotenv import load_dotenv
+import google.generativeai as genai
 from PIL import Image
 import streamlit as st
-import google.generativeai as genai
-import speech_recognition as sr
-from gtts import gTTS
 
-# --- Load environment and Gemini API key ---
+--- Load environment and API key ---
+
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
-# --- Page Setup ---
-st.set_page_config(page_title="Cowalsky AI", layout="centered")
+--- Page Setup ---
 
-# --- Title and description ---
+st.set_page_config(page_title="Cowalsky AI", page_icon="❄️", layout="centered")
 st.title("Cowalsky AI")
-st.caption("Chat with PenguinBot — powered by Gemini API and Nano Banana image generator.")
+st.caption("Chat, analyze images, and create visuals — powered by Google Gemini Free Models")
 
-# --- Function: Generate text response ---
-def generate_response(prompt):
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content(prompt)
-        return response.text
-    except Exception as e:
-        return f"Error: {e}"
+--- Function: Generate text or image analysis ---
 
-# --- Function: Generate Image ---
+def generate_text_or_analysis(prompt, image=None):
+try:
+model = genai.GenerativeModel("gemini-2.5-flash")
+if image:
+response = model.generate_content([prompt, image])
+else:
+response = model.generate_content(prompt)
+return response.text
+except Exception as e:
+return f"Error: {e}"
+
+--- Function: Generate image ---
+
 def generate_image(prompt):
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content([
-            prompt,
-            "Create a detailed image based on this description."
-        ])
-        if response.candidates and response.candidates[0].content.parts:
-            for part in response.candidates[0].content.parts:
-                if part.mime_type == "image/png":
-                    image_data = base64.b64decode(part.data)
-                    return Image.open(io.BytesIO(image_data))
-        return None
-    except Exception as e:
-        st.error(f"Image generation error: {e}")
-        return None
+try:
+model = genai.GenerativeModel("gemini-2.5-flash-image")
+result = model.generate_content(prompt)
+# Extract the image bytes (Gemini returns a blob)
+image_data = result.candidates[0].content.parts[0].blob
+image = Image.open(io.BytesIO(image_data))
+return image
+except Exception as e:
+st.error(f"Image generation error: {e}")
+return None
 
-# --- Function: Analyze Uploaded Image ---
-def analyze_image(uploaded_file, prompt):
-    try:
-        image = Image.open(uploaded_file)
-        model = genai.GenerativeModel("gemini-1.5-flash")
-        response = model.generate_content([prompt, image], stream=False)
-        return response.text
-    except Exception as e:
-        return f"Image analysis error: {e}"
+--- Helper: Convert image to downloadable format ---
 
-# --- Function: Convert Text to Speech ---
-def text_to_speech(text):
-    try:
-        tts = gTTS(text)
-        temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3")
-        tts.save(temp_file.name)
-        return temp_file.name
-    except Exception as e:
-        st.error(f"Voice generation error: {e}")
-        return None
+def get_image_download_link(img, filename="cowalsky_image.png"):
+buf = io.BytesIO()
+img.save(buf, format="PNG")
+byte_im = buf.getvalue()
+b64 = base64.b64encode(byte_im).decode()
+href = f'<a href="data:image/png;base64,{b64}" download="{filename}">Download Image</a>'
+return href
 
-# --- Function: Convert Speech to Text ---
-def speech_to_text(audio_file):
-    recognizer = sr.Recognizer()
-    try:
-        with sr.AudioFile(audio_file) as source:
-            audio = recognizer.record(source)
-        return recognizer.recognize_google(audio)
-    except Exception as e:
-        return f"Speech recognition error: {e}"
+--- User input ---
 
-# --- Input area ---
-st.write("Enter your message or record your voice below.")
-user_input = st.text_area("Prompt:", placeholder="Type or record something...")
+user_input = st.text_area("Enter your message or prompt:", placeholder="Type something...")
 
-# --- Voice recording upload ---
-uploaded_audio = st.file_uploader("Upload a voice recording (optional, WAV format recommended):", type=["wav", "mp3"])
+uploaded_file = st.file_uploader("Upload an image (optional for analysis):", type=["jpg", "jpeg", "png"])
 
-# --- Image upload for analysis ---
-uploaded_file = st.file_uploader("Upload an image for analysis (optional):", type=["png", "jpg", "jpeg"])
+--- Buttons ---
 
-# --- Buttons ---
-col1, col2, col3, col4 = st.columns(4)
+col1, col2 = st.columns(2)
 with col1:
-    text_btn = st.button("Generate Text")
+text_btn = st.button("Generate Text / Analyze")
 with col2:
-    img_btn = st.button("Generate Image")
-with col3:
-    analyze_btn = st.button("Analyze Image")
-with col4:
-    voice_btn = st.button("Analyze Voice")
+img_btn = st.button("Generate Image")
 
-# --- Voice Input ---
-if voice_btn and uploaded_audio:
-    with st.spinner("Processing voice input..."):
-        recognized_text = speech_to_text(uploaded_audio)
-        st.write("Recognized Text:")
-        st.write(recognized_text)
-        output = generate_response(recognized_text)
-        st.subheader("Cowalsky says:")
-        st.write(output)
-        voice_file = text_to_speech(output)
-        if voice_file:
-            st.audio(voice_file, format="audio/mp3")
+--- Text or Analysis Output ---
 
-# --- Text Generation Output ---
 if text_btn and user_input.strip():
-    with st.spinner("Generating response..."):
-        output = generate_response(user_input)
-    st.subheader("Cowalsky says:")
-    st.write(output)
-    voice_file = text_to_speech(output)
-    if voice_file:
-        st.audio(voice_file, format="audio/mp3")
+with st.spinner("Processing..."):
+image = None
+if uploaded_file is not None:
+image = Image.open(uploaded_file)
+output = generate_text_or_analysis(user_input, image)
+st.subheader("Result:")
+st.write(output)
 
-# --- Image Generation Output ---
+--- Image Generation Output ---
+
 if img_btn and user_input.strip():
-    with st.spinner("Generating image..."):
-        image = generate_image(user_input)
-    if image:
-        st.image(image, caption="Nano Banana Creation", use_container_width=True)
+with st.spinner("Creating image..."):
+image = generate_image(user_input)
+if image:
+st.image(image, caption="Generated Image", use_container_width=True)
+st.markdown(get_image_download_link(image), unsafe_allow_html=True)
 
-# --- Image Analysis Output ---
-if analyze_btn and uploaded_file and user_input.strip():
-    with st.spinner("Analyzing image..."):
-        analysis = analyze_image(uploaded_file, user_input)
-    st.subheader("Analysis Result:")
-    st.write(analysis)
-    voice_file = text_to_speech(analysis)
-    if voice_file:
-        st.audio(voice_file, format="audio/mp3")
+--- Credits ---
 
-# --- Footer ---
 st.markdown("---")
 st.markdown("Made by Parth, Arnav, Aarav.")
