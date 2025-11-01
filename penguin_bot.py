@@ -4,11 +4,10 @@ import re
 import easyocr
 import numpy as np
 from PIL import Image
-from io import BytesIO
 
 st.set_page_config(page_title="🐧 Penguin Bot", layout="wide")
 
-# Initialize session state
+# -------------------- INIT --------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -32,7 +31,6 @@ if uploaded_image:
 
     st.sidebar.text_area("Extracted Text", text, height=120)
 
-    # Detect IP addresses
     ips = re.findall(r'\b\d{1,3}(?:\.\d{1,3}){3}\b', text)
     if ips:
         st.sidebar.success(f"Detected IPs: {', '.join(ips)}")
@@ -62,7 +60,6 @@ geo_image = st.sidebar.file_uploader("Or upload image with IPs", type=["png", "j
 
 ip_candidates = []
 
-# If image uploaded, OCR it for IPs
 if geo_image:
     img = Image.open(geo_image)
     reader = easyocr.Reader(['en'])
@@ -98,12 +95,12 @@ if st.sidebar.button("Find Location"):
 # 💬 MAIN CHAT INTERFACE
 # ======================================================
 st.title("🐧 Penguin Bot")
-st.write("Chat with Penguin — a tactical AI assistant.")
+st.write("Chat with Penguin — your tactical AI assistant.")
 
 def render_chat():
-    for msg in reversed(st.session_state.messages):
+    for msg in st.session_state.messages[::-1]:  # newest first
         st.markdown(f"**{msg['role'].capitalize()}:** {msg['content']}")
-        st.markdown("---")
+        st.markdown("<br>", unsafe_allow_html=True)
 
 render_chat()
 
@@ -113,15 +110,13 @@ with col1:
 with col2:
     send_clicked = st.button("Send")
 
-# --- Handle input ---
 def handle_message():
     user_text = st.session_state.chat_input.strip()
     if user_text:
         st.session_state.messages.append({"role": "user", "content": user_text})
-        # Basic placeholder reply
         reply = f"Penguin 🐧 says: '{user_text}' sounds interesting!"
         st.session_state.messages.append({"role": "assistant", "content": reply})
-        st.rerun()  # Refresh UI
+        st.rerun()
 
 if send_clicked:
     handle_message()
