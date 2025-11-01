@@ -1,6 +1,7 @@
-streamlit
-openai
-google-genai
-pillow
-python-dotenv
-google-generativeai
+streamlit>=1.18.0
+requests>=2.32.0
+Pillow>=9.0.0
+pytesseract>=0.3.10
+google-generativeai>=0.7.2
+openai>=1.52.0
+pandas>=1.5.0
