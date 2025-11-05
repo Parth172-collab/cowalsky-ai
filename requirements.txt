@@ -1,6 +1,7 @@
 streamlit
-requests
-Pillow
 easyocr
-opencv-python-headless
 numpy
+pillow
+requests
+torch
+opencv-python-headless
