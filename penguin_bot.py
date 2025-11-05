@@ -90,6 +90,43 @@ if st.sidebar.button("Find Location"):
             st.sidebar.error(f"Error: {e}")
     else:
         st.sidebar.warning("Enter or upload an IP first.")
+# ======================================================
+# 🗜️ IMAGE COMPRESSOR
+# ======================================================
+st.sidebar.subheader("🗜️ Image Compressor (≤ 50 KB)")
+
+compress_image = st.sidebar.file_uploader("Upload an image to compress", type=["png", "jpg", "jpeg"])
+
+if compress_image:
+    img = Image.open(compress_image)
+    st.sidebar.image(img, caption="Original Image", use_container_width=True)
+    orig_size = len(compress_image.getvalue()) / 1024
+    st.sidebar.info(f"Original size: {orig_size:.2f} KB")
+
+    # Compression logic
+    target_size_kb = 50
+    quality = 95
+    img_format = img.format or "JPEG"
+
+    from io import BytesIO
+    buffer = BytesIO()
+    img.save(buffer, format=img_format, quality=quality, optimize=True)
+    size_kb = len(buffer.getvalue()) / 1024
+
+    while size_kb > target_size_kb and quality > 5:
+        buffer = BytesIO()
+        quality -= 5
+        img.save(buffer, format=img_format, quality=quality, optimize=True)
+        size_kb = len(buffer.getvalue()) / 1024
+
+    st.sidebar.success(f"Compressed to {size_kb:.2f} KB (Quality: {quality}%)")
+    st.sidebar.download_button(
+        label="📥 Download Compressed Image",
+        data=buffer.getvalue(),
+        file_name=f"compressed_{compress_image.name}",
+        mime=f"image/{img_format.lower()}"
+    )
+
 
 # ======================================================
 # 💬 MAIN CHAT INTERFACE
