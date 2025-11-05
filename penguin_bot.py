@@ -93,7 +93,7 @@ if st.sidebar.button("Find Location"):
 # ======================================================
 # 🗜️ IMAGE COMPRESSOR
 # ======================================================
-st.sidebar.subheader("🗜️ Image Compressor (≤ 50 KB)")
+st.sidebar.subheader("🗜️ Image Compressor (≤ 80 KB)")
 
 compress_image = st.sidebar.file_uploader("Upload an image to compress", type=["png", "jpg", "jpeg"])
 
@@ -104,7 +104,7 @@ if compress_image:
     st.sidebar.info(f"Original size: {orig_size:.2f} KB")
 
     # Compression logic
-    target_size_kb = 50
+    target_size_kb = 80   # <-- changed from 50 to 80
     quality = 95
     img_format = img.format or "JPEG"
 
